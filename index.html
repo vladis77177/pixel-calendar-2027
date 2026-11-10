@@ -9,6 +9,7 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
   <link rel="manifest" href="manifest.webmanifest">
+  <!--BUILD_INFO-->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Календарь">
@@ -385,6 +386,14 @@
             </select>
           </div>
           <div class="settings-field">
+            <label for="dialogAnimSelect">Анимация окон</label>
+            <select id="dialogAnimSelect">
+              <option value="auto">Авто (на Android выкл.)</option>
+              <option value="on">Включена</option>
+              <option value="off">Выключена</option>
+            </select>
+          </div>
+          <div class="settings-field">
             <label for="weekStartSelect">Первый день недели</label>
             <select id="weekStartSelect">
               <option value="1">Понедельник</option>
@@ -445,6 +454,23 @@
             </button>
           </div>
           <p class="settings-note" id="installNote">Если браузер поддерживает установку, кнопка появится автоматически.</p>
+        </section>
+
+        <section class="settings-section">
+          <h4 class="settings-title">Диагностика</h4>
+          <p class="settings-note">Если интерфейс подлагивает, измерьте открытие окон. Приложение само снимет длительности кадров и покажет отчёт.</p>
+          <div class="settings-actions">
+            <button class="pixel-btn settings-btn" id="perfBtn" type="button">
+              <svg class="icon"><use href="#i-check"></use></svg>
+              <span>Измерить окна</span>
+            </button>
+            <button class="pixel-btn settings-btn" id="perfCopyBtn" type="button">
+              <svg class="icon"><use href="#i-upload"></use></svg>
+              <span>Скопировать отчёт</span>
+            </button>
+          </div>
+          <pre class="perf-report" id="perfReport" hidden></pre>
+          <p class="settings-note settings-build" id="settingsBuild">Сборка: локальная</p>
         </section>
 
         <section class="settings-section settings-danger">

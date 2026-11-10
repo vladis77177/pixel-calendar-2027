@@ -73,6 +73,13 @@ html[data-profile="mobile"] .tool-dialog[open] .dialog-card {
   animation-timing-function: steps(2, end);
 }
 
+/* Отдельный выключатель анимации окон (data-dialog-anim из applyProfile).
+   Авторежим включает её на десктопе и выключает на мобильном профиле. */
+html[data-dialog-anim="off"] .day-dialog[open] .dialog-card,
+html[data-dialog-anim="off"] .tool-dialog[open] .dialog-card {
+  animation: none !important;
+}
+
 /* ——— Плотность ——— */
 
 html[data-density="compact"] .day-cell {

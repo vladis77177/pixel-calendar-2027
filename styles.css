@@ -3216,6 +3216,32 @@ html[data-profile="full"] .tool-dialog::backdrop {
   text-align: center;
 }
 
+/* Отчёт встроенной проверки плавности */
+.perf-report {
+  margin: 9px 0 0;
+  padding: 9px 10px;
+  max-height: 230px;
+  overflow: auto;
+  background: #1f2a1b;
+  border: 2px solid var(--line);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.08);
+  color: #d8f5c0;
+  font-family: ui-monospace, "Consolas", "Courier New", monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+
+.settings-build {
+  margin-top: 9px;
+  font-family: var(--font-pixel);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: #7b6442;
+}
+
 @media (max-width: 760px) {
   .utility-tools {
     width: 100%;

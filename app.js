@@ -6,11 +6,13 @@
   const PROFILES = ["auto", "mobile", "full"];
   const DENSITIES = ["comfortable", "compact"];
   const MOTION_MODES = ["auto", "on", "off"];
+  const DIALOG_ANIM_MODES = ["auto", "on", "off"];
   const DEFAULT_SETTINGS = {
     showHolidays: true,
     profile: "auto",
     density: "comfortable",
     motion: "auto",
+    dialogAnimation: "auto",
     decor: true,
     weekStart: 1
   };
@@ -106,8 +108,13 @@
     profileSelect: document.getElementById("profileSelect"),
     densitySelect: document.getElementById("densitySelect"),
     motionSelect: document.getElementById("motionSelect"),
+    dialogAnimSelect: document.getElementById("dialogAnimSelect"),
     weekStartSelect: document.getElementById("weekStartSelect"),
     decorToggle: document.getElementById("decorToggle"),
+    settingsBuild: document.getElementById("settingsBuild"),
+    perfBtn: document.getElementById("perfBtn"),
+    perfCopyBtn: document.getElementById("perfCopyBtn"),
+    perfReport: document.getElementById("perfReport"),
     exportJsonBtn: document.getElementById("exportJsonBtn"),
     importJsonBtn: document.getElementById("importJsonBtn"),
     importFile: document.getElementById("importFile"),
@@ -146,6 +153,7 @@
   let deferredInstallPrompt = null;
   let suppressClickUntil = 0;
   let widgetSyncTimer = 0;
+  let probing = false;
 
   function pad2(value) {
     return String(value).padStart(2, "0");
@@ -343,6 +351,9 @@
         profile: PROFILES.includes(rawSettings.profile) ? rawSettings.profile : DEFAULT_SETTINGS.profile,
         density: DENSITIES.includes(rawSettings.density) ? rawSettings.density : DEFAULT_SETTINGS.density,
         motion: MOTION_MODES.includes(rawSettings.motion) ? rawSettings.motion : DEFAULT_SETTINGS.motion,
+        dialogAnimation: DIALOG_ANIM_MODES.includes(rawSettings.dialogAnimation)
+          ? rawSettings.dialogAnimation
+          : DEFAULT_SETTINGS.dialogAnimation,
         decor: rawSettings.decor !== false,
         weekStart: rawSettings.weekStart === 0 ? 0 : 1
       }
@@ -1510,7 +1521,7 @@
   function openSearch() {
     renderSearch();
     showDialog(els.searchDialog);
-    window.setTimeout(() => els.searchInput.focus(), 30);
+    if (!probing) window.setTimeout(() => els.searchInput.focus(), 30);
   }
 
   function collectSearchResults() {
@@ -1620,6 +1631,7 @@
     els.profileSelect.value = state.settings.profile;
     els.densitySelect.value = state.settings.density;
     els.motionSelect.value = state.settings.motion;
+    els.dialogAnimSelect.value = state.settings.dialogAnimation;
     els.decorToggle.checked = state.settings.decor;
     els.weekStartSelect.value = String(state.settings.weekStart);
   }
@@ -1638,6 +1650,117 @@
   function updateSettingsMeta() {
     const totalTasks = Object.values(state.tasks).reduce((sum, list) => sum + list.length, 0);
     els.settingsMeta.textContent = `${totalTasks} ${tasksWord(totalTasks)} · ${state.series.length} ${seriesWord(state.series.length)}`;
+    if (els.settingsBuild) els.settingsBuild.textContent = `Сборка: ${buildLabel()}`;
+  }
+
+  function buildLabel() {
+    const info = window.__BUILD_INFO__;
+    if (!info || !info.commit) return "локальная";
+    return info.date ? `${info.commit} · ${info.date}` : info.commit;
+  }
+
+  function nextFrame() {
+    return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
+  }
+
+  // Снимает длительности кадров на протяжении duration мс.
+  function measureFrames(duration) {
+    return new Promise((resolve) => {
+      const deltas = [];
+      let previous = performance.now();
+      const start = previous;
+      function tick(now) {
+        deltas.push(now - previous);
+        previous = now;
+        if (now - start < duration) window.requestAnimationFrame(tick);
+        else resolve(deltas);
+      }
+      window.requestAnimationFrame(tick);
+    });
+  }
+
+  function describeFrames(deltas) {
+    if (!deltas.length) return { count: 0, avg: 0, max: 0, over33: 0, over50: 0 };
+    const total = deltas.reduce((sum, value) => sum + value, 0);
+    return {
+      count: deltas.length,
+      avg: total / deltas.length,
+      max: Math.max(...deltas),
+      over33: deltas.filter((value) => value > 33.4).length,
+      over50: deltas.filter((value) => value > 50).length
+    };
+  }
+
+  function hideOpenDialogs() {
+    document.querySelectorAll("dialog[open]").forEach((dialog) => hideDialog(dialog));
+  }
+
+  async function measureDialogOpen(label, openFn) {
+    await nextFrame();
+    await nextFrame();
+    const startedAt = performance.now();
+    openFn();
+    const openedAt = performance.now();
+    const deltas = await measureFrames(650);
+    hideOpenDialogs();
+    await nextFrame();
+    return { label, open: openedAt - startedAt, frames: describeFrames(deltas) };
+  }
+
+  function formatProbeReport(results) {
+    const root = document.documentElement;
+    const lines = [
+      `Профиль: ${root.dataset.profile} · плотность: ${root.dataset.density}`,
+      `Анимации: ${root.dataset.motion} · окна: ${root.dataset.dialogAnim}`,
+      `Экран: ${window.innerWidth}×${window.innerHeight} @${window.devicePixelRatio}x`,
+      `Сборка: ${buildLabel()}`,
+      ""
+    ];
+    results.forEach((result) => {
+      const frames = result.frames;
+      lines.push(result.label);
+      lines.push(`  открытие (JS + showModal): ${result.open.toFixed(1)} мс`);
+      lines.push(`  кадры: ${frames.count} · средний ${frames.avg.toFixed(1)} мс · максимум ${frames.max.toFixed(1)} мс`);
+      lines.push(`  дольше 33 мс: ${frames.over33} · дольше 50 мс: ${frames.over50}`);
+      lines.push("");
+    });
+    return lines.join("\n");
+  }
+
+  async function runPerfProbe() {
+    if (!els.perfBtn || probing) return;
+    probing = true;
+    els.perfBtn.disabled = true;
+    els.perfReport.hidden = false;
+    els.perfReport.textContent = "Измеряю…";
+    hideDialog(els.settingsDialog);
+    await nextFrame();
+
+    const results = [];
+    try {
+      results.push(await measureDialogOpen("Окно дня", () => openDay(state.selectedDate)));
+      results.push(await measureDialogOpen("Поиск", () => openSearch()));
+      results.push(await measureDialogOpen("Настройки", () => openSettings()));
+    } catch (error) {
+      results.push({ label: "Ошибка измерения", open: 0, frames: describeFrames([]) });
+    }
+
+    probing = false;
+    els.perfBtn.disabled = false;
+    els.perfReport.textContent = formatProbeReport(results);
+    hideOpenDialogs();
+    openSettings();
+  }
+
+  async function copyProbeReport() {
+    const text = els.perfReport ? els.perfReport.textContent : "";
+    if (!text || els.perfReport.hidden) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("Отчёт скопирован");
+    } catch (error) {
+      showToast("Не удалось скопировать — сделайте скриншот");
+    }
   }
 
   function downloadFile(filename, content, type) {
@@ -2058,6 +2181,14 @@
       applyProfile();
     });
 
+    els.dialogAnimSelect.addEventListener("change", () => {
+      state.settings.dialogAnimation = DIALOG_ANIM_MODES.includes(els.dialogAnimSelect.value)
+        ? els.dialogAnimSelect.value
+        : "auto";
+      saveStore();
+      applyProfile();
+    });
+
     els.decorToggle.addEventListener("change", () => {
       state.settings.decor = els.decorToggle.checked;
       saveStore();
@@ -2075,6 +2206,8 @@
     els.importJsonBtn.addEventListener("click", () => els.importFile.click());
     els.importFile.addEventListener("change", handleImportFile);
     els.clearDataBtn.addEventListener("click", clearAllData);
+    if (els.perfBtn) els.perfBtn.addEventListener("click", runPerfProbe);
+    if (els.perfCopyBtn) els.perfCopyBtn.addEventListener("click", copyProbeReport);
 
     els.installBtn.addEventListener("click", async () => {
       if (!deferredInstallPrompt) return;
@@ -2173,6 +2306,14 @@
     );
   }
 
+  // Анимация окон: auto = включена везде, кроме мобильного профиля.
+  function resolveDialogAnimation(profile) {
+    const mode = state.settings.dialogAnimation;
+    if (mode === "off") return false;
+    if (mode === "on") return true;
+    return profile !== "mobile";
+  }
+
   // Ставит на <html> атрибуты, по которым CSS выбирает профиль, плотность и анимации.
   function applyProfile() {
     const root = document.documentElement;
@@ -2185,6 +2326,7 @@
     root.dataset.density = state.settings.density === "compact" ? "compact" : "comfortable";
     root.dataset.motion = state.settings.motion === "off" ? "off" : "on";
     root.dataset.decor = state.settings.decor ? "on" : "off";
+    root.dataset.dialogAnim = resolveDialogAnimation(profile) ? "on" : "off";
   }
 
   function init() {
