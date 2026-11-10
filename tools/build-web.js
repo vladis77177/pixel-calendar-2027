@@ -9,6 +9,7 @@ const OUT = path.join(ROOT, "www");
 const FILES = [
   "index.html",
   "styles.css",
+  "app.mobile.css",
   "app.js",
   "widget.html",
   "widget.css",

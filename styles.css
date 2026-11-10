@@ -203,8 +203,8 @@ input:focus-visible {
   width: 78px;
   height: 22px;
   background: rgba(255, 255, 255, 0.82);
-  filter: drop-shadow(0 7px 0 rgba(82, 156, 190, 0.08));
   animation: cloud-drift 88s linear infinite;
+  will-change: translate;
 }
 
 .cloud i {
@@ -848,6 +848,7 @@ input:focus-visible {
 
 .calendar-view {
   min-height: 260px;
+  contain: layout style;
 }
 
 /* вЂ”вЂ”вЂ” РњРµСЃСЏС† вЂ”вЂ”вЂ” */
@@ -1243,6 +1244,7 @@ input:focus-visible {
 .mini-month {
   min-width: 0;
   padding: 10px;
+  contain: content;
   background: #fffbf1;
   border: 2px solid #ddc89d;
   box-shadow:
@@ -1445,6 +1447,10 @@ input:focus-visible {
 
 .day-dialog::backdrop {
   background: rgba(30, 46, 28, 0.58);
+}
+
+/* Размытие подложки — только в полном профиле: на Android это дорогая операция. */
+html[data-profile="full"] .day-dialog::backdrop {
   backdrop-filter: blur(3px);
 }
 
@@ -1986,20 +1992,20 @@ input:focus-visible {
 
 @keyframes cloud-drift {
   from {
-    left: -160px;
+    translate: 0 0;
   }
   to {
-    left: calc(100vw + 40px);
+    translate: calc(100vw + 200px) 0;
   }
 }
 
 @keyframes sun-glow {
   0%,
   100% {
-    filter: brightness(1);
+    opacity: 0.92;
   }
   50% {
-    filter: brightness(1.08);
+    opacity: 1;
   }
 }
 
@@ -2802,6 +2808,9 @@ input:focus-visible {
 
 .tool-dialog::backdrop {
   background: rgba(30, 46, 28, 0.58);
+}
+
+html[data-profile="full"] .tool-dialog::backdrop {
   backdrop-filter: blur(3px);
 }
 
@@ -3065,6 +3074,44 @@ input:focus-visible {
   font-size: 11.5px;
   font-weight: 700;
   line-height: 1.35;
+}
+
+.settings-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+  color: #4f3b23;
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.settings-field label {
+  min-width: 0;
+}
+
+.settings-field select {
+  flex: 0 1 auto;
+  min-height: 32px;
+  max-width: 62%;
+  padding: 3px 6px;
+  background: #fffdf7;
+  border: 3px solid var(--line);
+  box-shadow: inset 0 3px 0 #f0e4c7;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.settings-field select:focus-visible {
+  outline: 3px solid #2f7fff;
+  outline-offset: 2px;
+}
+
+.settings-section .toggle-row {
+  margin-top: 4px;
 }
 
 .settings-actions {

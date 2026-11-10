@@ -13,6 +13,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Календарь">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="app.mobile.css">
 </head>
 <body>
   <a class="skip-link" href="#calendarSection">Перейти к календарю</a>
@@ -356,6 +357,46 @@
             <span>Показывать государственные праздники</span>
           </label>
           <p class="settings-note">Праздники отмечаются звёздочкой в календаре и подписью в окне дня.</p>
+        </section>
+
+        <section class="settings-section">
+          <h4 class="settings-title">Вид и производительность</h4>
+          <div class="settings-field">
+            <label for="profileSelect">Профиль интерфейса</label>
+            <select id="profileSelect">
+              <option value="auto">Авто</option>
+              <option value="mobile">Мобильный</option>
+              <option value="full">Полный</option>
+            </select>
+          </div>
+          <div class="settings-field">
+            <label for="densitySelect">Плотность календаря</label>
+            <select id="densitySelect">
+              <option value="comfortable">Обычная</option>
+              <option value="compact">Компактная</option>
+            </select>
+          </div>
+          <div class="settings-field">
+            <label for="motionSelect">Анимации</label>
+            <select id="motionSelect">
+              <option value="auto">Как в системе</option>
+              <option value="on">Всегда включены</option>
+              <option value="off">Выключены</option>
+            </select>
+          </div>
+          <div class="settings-field">
+            <label for="weekStartSelect">Первый день недели</label>
+            <select id="weekStartSelect">
+              <option value="1">Понедельник</option>
+              <option value="0">Воскресенье</option>
+            </select>
+          </div>
+          <label class="toggle-row">
+            <input type="checkbox" id="decorToggle" checked>
+            <span class="toggle-mark" aria-hidden="true"></span>
+            <span>Декор: солнце, облака, острова</span>
+          </label>
+          <p class="settings-note">Мобильный профиль отключает размытие подложки и тяжёлые тени, поэтому меню открываются плавнее. «Авто» выбирает его сам на Android.</p>
         </section>
 
         <section class="settings-section">

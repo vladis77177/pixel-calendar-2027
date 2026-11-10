@@ -3,6 +3,17 @@
 
   const STORAGE_KEY = "pixel-calendar-2027-v1";
   const VIEWS = ["week", "month", "quarter", "year"];
+  const PROFILES = ["auto", "mobile", "full"];
+  const DENSITIES = ["comfortable", "compact"];
+  const MOTION_MODES = ["auto", "on", "off"];
+  const DEFAULT_SETTINGS = {
+    showHolidays: true,
+    profile: "auto",
+    density: "comfortable",
+    motion: "auto",
+    decor: true,
+    weekStart: 1
+  };
   const REPEATS = ["none", "daily", "weekdays", "weekly", "monthly"];
   const MAX_SEARCH_RESULTS = 100;
   const MONTHS_NOMINATIVE = [
@@ -92,6 +103,11 @@
     settingsDialog: document.getElementById("settingsDialog"),
     settingsCloseBtn: document.getElementById("settingsCloseBtn"),
     holidaysToggle: document.getElementById("holidaysToggle"),
+    profileSelect: document.getElementById("profileSelect"),
+    densitySelect: document.getElementById("densitySelect"),
+    motionSelect: document.getElementById("motionSelect"),
+    weekStartSelect: document.getElementById("weekStartSelect"),
+    decorToggle: document.getElementById("decorToggle"),
     exportJsonBtn: document.getElementById("exportJsonBtn"),
     importJsonBtn: document.getElementById("importJsonBtn"),
     importFile: document.getElementById("importFile"),
@@ -164,10 +180,29 @@
     return new Date(date.getFullYear(), date.getMonth() + amount, 1);
   }
 
+  function weekStartDay() {
+    return state.settings.weekStart === 0 ? 0 : 1;
+  }
+
+  function weekOffset(date) {
+    return (date.getDay() - weekStartDay() + 7) % 7;
+  }
+
+  function rotateFromMonday(list) {
+    return weekStartDay() === 1 ? list : [list[6]].concat(list.slice(0, 6));
+  }
+
+  function weekdayShortLabels() {
+    return rotateFromMonday(WEEKDAYS_MONDAY_FIRST);
+  }
+
+  function weekdayLongLabels() {
+    return rotateFromMonday(WEEKDAYS_LONG_MONDAY_FIRST);
+  }
+
   function startOfWeek(date) {
     const result = startOfDay(date);
-    const offset = (result.getDay() + 6) % 7;
-    result.setDate(result.getDate() - offset);
+    result.setDate(result.getDate() - weekOffset(result));
     return result;
   }
 
@@ -242,7 +277,7 @@
   }
 
   function normalizeStore(parsed) {
-    const fallback = { view: "month", tasks: {}, series: [], settings: { showHolidays: true } };
+    const fallback = { view: "month", tasks: {}, series: [], settings: { ...DEFAULT_SETTINGS } };
     if (!parsed || typeof parsed !== "object") return fallback;
 
     const view = VIEWS.includes(parsed.view) ? parsed.view : "month";
@@ -297,12 +332,19 @@
       });
     }
 
+    const rawSettings = parsed.settings && typeof parsed.settings === "object" ? parsed.settings : {};
+
     return {
       view,
       tasks,
       series,
       settings: {
-        showHolidays: !(parsed.settings && parsed.settings.showHolidays === false)
+        showHolidays: rawSettings.showHolidays !== false,
+        profile: PROFILES.includes(rawSettings.profile) ? rawSettings.profile : DEFAULT_SETTINGS.profile,
+        density: DENSITIES.includes(rawSettings.density) ? rawSettings.density : DEFAULT_SETTINGS.density,
+        motion: MOTION_MODES.includes(rawSettings.motion) ? rawSettings.motion : DEFAULT_SETTINGS.motion,
+        decor: rawSettings.decor !== false,
+        weekStart: rawSettings.weekStart === 0 ? 0 : 1
       }
     };
   }
@@ -707,16 +749,17 @@
     const year = state.cursor.getFullYear();
     const month = state.cursor.getMonth();
     const first = new Date(year, month, 1);
-    const offset = (first.getDay() + 6) % 7;
+    const offset = weekOffset(first);
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const totalCells = Math.ceil((offset + daysInMonth) / 7) * 7;
     const gridStart = addDays(first, -offset);
 
     const wrapper = el("div", "month-calendar");
     const weekdays = el("div", "weekday-row");
-    WEEKDAYS_MONDAY_FIRST.forEach((name, index) => {
+    weekdayShortLabels().forEach((name, index) => {
       const item = el("span", "weekday-name", name);
-      if (index > 4) item.classList.add("is-weekend");
+      const weekday = (weekStartDay() + index) % 7;
+      if (weekday === 0 || weekday === 6) item.classList.add("is-weekend");
       weekdays.appendChild(item);
     });
 
@@ -756,7 +799,7 @@
       if (selected) card.classList.add("is-selected");
 
       const top = el("span", "week-day-top");
-      top.appendChild(el("span", "week-day-name", WEEKDAYS_LONG_MONDAY_FIRST[index]));
+      top.appendChild(el("span", "week-day-name", weekdayLongLabels()[index]));
 
       const dateLine = el("span", "week-date-line");
       const dateBox = el("span");
@@ -832,12 +875,12 @@
     card.appendChild(head);
 
     const weekdays = el("div", "mini-weekdays");
-    WEEKDAYS_MONDAY_FIRST.forEach((name) => weekdays.appendChild(el("span", "mini-weekday", name)));
+    weekdayShortLabels().forEach((name) => weekdays.appendChild(el("span", "mini-weekday", name)));
     card.appendChild(weekdays);
 
     const grid = el("div", "mini-grid");
     const first = new Date(year, month, 1);
-    const offset = (first.getDay() + 6) % 7;
+    const offset = weekOffset(first);
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const totalCells = Math.ceil((offset + daysInMonth) / 7) * 7;
 
@@ -983,15 +1026,31 @@
     }
   }
 
+  function markSelected(iso, selected) {
+    if (!iso) return;
+    els.calendarView.querySelectorAll(`[data-date="${iso}"]`).forEach((node) => {
+      node.classList.toggle("is-selected", selected);
+    });
+  }
+
+  // Обновляет только подсветку выбранного дня, не перестраивая весь вид.
+  function selectDate(iso) {
+    const previous = state.selectedDate;
+    if (previous === iso) return;
+    state.selectedDate = iso;
+    markSelected(previous, false);
+    markSelected(iso, true);
+    renderQuickAddDate();
+  }
+
   function openDay(iso) {
     const date = fromISO(iso);
     if (Number.isNaN(date.getTime())) return;
-    state.selectedDate = iso;
+    selectDate(iso);
     state.dialogDate = iso;
     state.editingKey = null;
     state.deleteConfirmKey = null;
     lastDayISO = iso;
-    renderAll(false);
     populateDialog();
     els.formError.textContent = "";
     els.taskInput.value = "";
@@ -1556,8 +1615,17 @@
     });
   }
 
-  function openSettings() {
+  function syncSettingsControls() {
     els.holidaysToggle.checked = state.settings.showHolidays;
+    els.profileSelect.value = state.settings.profile;
+    els.densitySelect.value = state.settings.density;
+    els.motionSelect.value = state.settings.motion;
+    els.decorToggle.checked = state.settings.decor;
+    els.weekStartSelect.value = String(state.settings.weekStart);
+  }
+
+  function openSettings() {
+    syncSettingsControls();
     updateSettingsMeta();
     if (!/^https?:$/.test(window.location.protocol)) {
       els.installNote.textContent = "Установка PWA доступна при открытии сайта через http:// или https://. Сейчас страница открыта как файл.";
@@ -1744,6 +1812,7 @@
       state.selectedDate = toISO(startOfDay(new Date()));
       state.cursor = startOfDay(new Date());
       saveStore();
+      applyProfile();
       renderAll(false);
       if (state.dialogDate && els.dialog.open) populateDialog();
       updateSettingsMeta();
@@ -1970,6 +2039,37 @@
       if (state.dialogDate && els.dialog.open) populateDialog();
     });
 
+    els.profileSelect.addEventListener("change", () => {
+      state.settings.profile = PROFILES.includes(els.profileSelect.value) ? els.profileSelect.value : "auto";
+      saveStore();
+      applyProfile();
+    });
+
+    els.densitySelect.addEventListener("change", () => {
+      state.settings.density = DENSITIES.includes(els.densitySelect.value) ? els.densitySelect.value : "comfortable";
+      saveStore();
+      applyProfile();
+      renderAll(false);
+    });
+
+    els.motionSelect.addEventListener("change", () => {
+      state.settings.motion = MOTION_MODES.includes(els.motionSelect.value) ? els.motionSelect.value : "auto";
+      saveStore();
+      applyProfile();
+    });
+
+    els.decorToggle.addEventListener("change", () => {
+      state.settings.decor = els.decorToggle.checked;
+      saveStore();
+      applyProfile();
+    });
+
+    els.weekStartSelect.addEventListener("change", () => {
+      state.settings.weekStart = els.weekStartSelect.value === "0" ? 0 : 1;
+      saveStore();
+      renderAll(false);
+    });
+
     els.exportJsonBtn.addEventListener("click", exportJson);
     els.exportIcsBtn.addEventListener("click", exportICS);
     els.importJsonBtn.addEventListener("click", () => els.importFile.click());
@@ -2020,9 +2120,13 @@
         state.series = parsed.series;
         state.settings = parsed.settings;
         state.view = parsed.view;
+        applyProfile();
         renderAll(false);
         if (state.dialogDate && els.dialog.open) populateDialog();
-        if (els.settingsDialog.open) updateSettingsMeta();
+        if (els.settingsDialog.open) {
+          syncSettingsControls();
+          updateSettingsMeta();
+        }
       } catch (error) {
         // Ignore malformed data from another tab.
       }
@@ -2061,7 +2165,30 @@
     });
   }
 
+  function isNativeApp() {
+    return Boolean(
+      window.Capacitor
+      && typeof window.Capacitor.isNativePlatform === "function"
+      && window.Capacitor.isNativePlatform()
+    );
+  }
+
+  // Ставит на <html> атрибуты, по которым CSS выбирает профиль, плотность и анимации.
+  function applyProfile() {
+    const root = document.documentElement;
+    const native = isNativeApp();
+    const chosen = state.settings.profile;
+    const profile = chosen === "auto" ? (native ? "mobile" : "full") : chosen;
+
+    root.dataset.platform = native ? "android" : "web";
+    root.dataset.profile = profile;
+    root.dataset.density = state.settings.density === "compact" ? "compact" : "comfortable";
+    root.dataset.motion = state.settings.motion === "off" ? "off" : "on";
+    root.dataset.decor = state.settings.decor ? "on" : "off";
+  }
+
   function init() {
+    applyProfile();
     updateTodayLabel();
     bindEvents();
     setupInstall();
