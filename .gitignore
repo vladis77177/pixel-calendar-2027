@@ -8,3 +8,5 @@ local.properties
 *.log
 .DS_Store
 *.apk
+# Ключ подписи APK — только локально и в GitHub Secrets
+/.signing/

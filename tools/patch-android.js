@@ -174,6 +174,58 @@ if (fs.existsSync(stringsFile)) {
   }
 }
 
+// 7. Signing: use a stable release key when CI provides keystore.properties
+const gradleFile = path.join(ANDROID, "app", "build.gradle");
+let gradle = fs.readFileSync(gradleFile, "utf8");
+
+if (!gradle.includes("keystorePropertiesFile")) {
+  gradle = gradle.replace(
+    "apply plugin: 'com.android.application'",
+    `apply plugin: 'com.android.application'
+
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}`
+  );
+
+  gradle = gradle.replace(
+    "    buildTypes {",
+    `    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile rootProject.file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+                storeType 'PKCS12'
+            }
+        }
+    }
+    buildTypes {
+        debug {
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+        }`
+  );
+
+  gradle = gradle.replace(
+    "        release {\n            minifyEnabled false",
+    `        release {
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled false`
+  );
+
+  fs.writeFileSync(gradleFile, gradle);
+  console.log("Signing config injected into app/build.gradle");
+} else {
+  console.log("Signing config already present in app/build.gradle");
+}
+
 console.log(`Android project patched for ${PACKAGE}`);
 console.log(`MainActivity: ${path.relative(ROOT, mainActivity)}`);
 console.log("Widget receiver, icons and splash screens are ready.");
