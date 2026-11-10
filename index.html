@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#8bd8ff">
+  <meta name="description" content="Милый пиксельный календарь на 2027 год с задачами по дням, повторами, поиском и экспортом в Google Календарь.">
+  <title>Пиксельный календарь 2027</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Календарь">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#calendarSection">Перейти к календарю</a>
+
+  <div class="world" aria-hidden="true">
+    <div class="sun"></div>
+    <div class="cloud cloud-a"><i></i><i></i><i></i></div>
+    <div class="cloud cloud-b"><i></i><i></i><i></i></div>
+    <div class="cloud cloud-c"><i></i><i></i><i></i></div>
+    <div class="float-island float-island-a">
+      <span class="island-grass"></span>
+      <span class="island-dirt"></span>
+    </div>
+    <div class="float-island float-island-b">
+      <span class="island-grass"></span>
+      <span class="island-dirt"></span>
+    </div>
+    <div class="terrain">
+      <div class="terrain-grass"></div>
+      <div class="terrain-dirt"></div>
+      <span class="pixel-flower flower-a"></span>
+      <span class="pixel-flower flower-b"></span>
+      <span class="pixel-flower flower-c"></span>
+      <span class="pixel-mushroom"></span>
+    </div>
+  </div>
+
+  <svg class="svg-sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-left" viewBox="0 0 24 24">
+      <path d="M15 5 8 12l7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter"/>
+    </symbol>
+    <symbol id="i-right" viewBox="0 0 24 24">
+      <path d="m9 5 7 7-7 7" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter"/>
+    </symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24">
+      <rect x="10" y="4" width="4" height="16" fill="currentColor"/>
+      <rect x="4" y="10" width="16" height="4" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-close" viewBox="0 0 24 24">
+      <path d="M6 6l12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"/>
+    </symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24">
+      <path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13M10 10v7M14 10v7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square" stroke-linejoin="miter"/>
+    </symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24">
+      <path d="m5 16-1 4 4-1L19 8l-3-3L5 16Z" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linejoin="miter"/>
+      <path d="m14 7 3 3" fill="none" stroke="currentColor" stroke-width="2.3"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24">
+      <path d="m4 12 5 5L20 6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter"/>
+    </symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24">
+      <path d="M4 6h16v14H4V6Zm0 5h16M8 3v6M16 3v6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="square"/>
+      <path d="M8 15h3v3H8z" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24">
+      <path d="M6 21V4M6 5h11l-2 4 2 4H6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="miter"/>
+    </symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24">
+      <path d="M12 2v6M12 16v6M2 12h6M16 12h6M5 5l4 4M15 15l4 4M19 5l-4 4M9 15l-4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/>
+    </symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24">
+      <path d="M6 10h12v10H6V10Zm3 0V7a3 3 0 0 1 6 0v3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="miter"/>
+      <rect x="11" y="14" width="2" height="3" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24">
+      <rect x="9" y="9" width="6" height="6" fill="currentColor"/>
+      <path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square"/>
+    </symbol>
+    <symbol id="i-search" viewBox="0 0 24 24">
+      <circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2.6"/>
+      <path d="m15 15 5 5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"/>
+    </symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24">
+      <path d="M10 3h4l1 3 3 1 2-2 3 3-2 2 1 3 3 1v4l-3 1-1 3 2 2-3 3-2-2-3 1-1 3h-4l-1-3-3-1-2 2-3-3 2-2-1-3-3-1V10l3-1 1-3-2-2 3-3 2 2 3-1 1-3Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="miter"/>
+      <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2.2"/>
+    </symbol>
+    <symbol id="i-widget" viewBox="0 0 24 24">
+      <rect x="4" y="4" width="7" height="7" fill="currentColor"/>
+      <rect x="13" y="4" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/>
+      <rect x="4" y="13" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/>
+      <rect x="13" y="13" width="7" height="7" fill="currentColor"/>
+    </symbol>
+    <symbol id="i-repeat" viewBox="0 0 24 24">
+      <path d="M4 9V7h13l-3-3M20 15v2H7l3 3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square" stroke-linejoin="miter"/>
+    </symbol>
+    <symbol id="i-download" viewBox="0 0 24 24">
+      <path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v4h16v-4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square" stroke-linejoin="miter"/>
+    </symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24">
+      <path d="M12 16V4m0 0L8 8m4-4 4 4M4 17v4h16v-4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square" stroke-linejoin="miter"/>
+    </symbol>
+    <symbol id="i-external" viewBox="0 0 24 24">
+      <path d="M14 4h6v6M20 4l-8 8M18 14v6H4V6h6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square" stroke-linejoin="miter"/>
+    </symbol>
+  </svg>
+
+  <div class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="#calendarSection" aria-label="Пиксельный календарь 2027 — на главную">
+        <span class="logo-block" aria-hidden="true">
+          <svg viewBox="0 0 16 16" shape-rendering="crispEdges">
+            <rect width="16" height="16" fill="#3a2718"/>
+            <rect x="1" y="1" width="14" height="14" fill="#80522e"/>
+            <rect x="1" y="1" width="14" height="5" fill="#5fb947"/>
+            <rect x="1" y="1" width="14" height="2" fill="#8ee06e"/>
+            <rect x="2" y="6" width="3" height="2" fill="#539f3d"/>
+            <rect x="6" y="6" width="2" height="2" fill="#72ca55"/>
+            <rect x="11" y="6" width="3" height="2" fill="#539f3d"/>
+            <rect x="3" y="9" width="2" height="2" fill="#694021"/>
+            <rect x="8" y="10" width="3" height="2" fill="#956237"/>
+            <rect x="12" y="12" width="2" height="2" fill="#694021"/>
+            <rect x="2" y="12" width="2" height="2" fill="#9a6639"/>
+            <rect x="13" y="3" width="1" height="1" fill="#fff1a8"/>
+          </svg>
+        </span>
+        <span class="brand-copy">
+          <span class="brand-eyebrow">Plans &amp; adventures</span>
+          <span class="brand-title">Календарь <span class="brand-year">2027</span></span>
+        </span>
+      </a>
+
+      <div class="today-chip" id="todayChip">
+        <span class="today-icon" aria-hidden="true"><svg class="icon"><use href="#i-sun"></use></svg></span>
+        <span class="today-copy">
+          <span class="today-label">Актуальная дата</span>
+          <strong id="todayLabel">Сегодня</strong>
+        </span>
+      </div>
+    </header>
+
+    <main class="game-panel" id="calendarSection">
+      <div class="panel-shine" aria-hidden="true"></div>
+
+      <div class="toolbar">
+        <div class="view-switcher" role="group" aria-label="Вид календаря">
+          <button class="view-tab" type="button" data-view="week" aria-pressed="false">Неделя</button>
+          <button class="view-tab" type="button" data-view="month" aria-pressed="true">Месяц</button>
+          <button class="view-tab" type="button" data-view="quarter" aria-pressed="false">Квартал</button>
+          <button class="view-tab" type="button" data-view="year" aria-pressed="false">Год</button>
+        </div>
+
+        <div class="nav-tools">
+          <div class="step-buttons" role="group" aria-label="Навигация по календарю">
+            <button class="pixel-btn icon-btn" id="prevBtn" type="button" aria-label="Предыдущий период">
+              <svg class="icon"><use href="#i-left"></use></svg>
+            </button>
+            <button class="pixel-btn today-btn" id="todayBtn" type="button">Сегодня</button>
+            <button class="pixel-btn icon-btn" id="nextBtn" type="button" aria-label="Следующий период">
+              <svg class="icon"><use href="#i-right"></use></svg>
+            </button>
+          </div>
+          <button class="pixel-btn year-jump" id="yearJumpBtn" type="button" aria-label="Перейти к 2027 году">
+            <span class="year-jump-star" aria-hidden="true"><svg class="icon"><use href="#i-sparkle"></use></svg></span>
+            2027
+          </button>
+        </div>
+
+        <div class="utility-tools" role="group" aria-label="Инструменты календаря">
+          <button class="pixel-btn tool-btn" id="searchBtn" type="button" aria-label="Открыть поиск и фильтры">
+            <svg class="icon"><use href="#i-search"></use></svg>
+            <span>Поиск</span>
+          </button>
+          <a class="pixel-btn tool-btn" href="widget.html" aria-label="Открыть мини-виджет на сегодня">
+            <svg class="icon"><use href="#i-widget"></use></svg>
+            <span>Виджет</span>
+          </a>
+          <button class="pixel-btn tool-btn" id="settingsBtn" type="button" aria-label="Открыть настройки, резервные копии и Google Календарь">
+            <svg class="icon"><use href="#i-settings"></use></svg>
+            <span>Настройки</span>
+          </button>
+        </div>
+      </div>
+
+      <form class="quick-add" id="quickAddForm" novalidate>
+        <span class="quick-add-label">
+          <span class="quick-cube" aria-hidden="true"></span>
+          Быстро на <strong id="quickAddDate">сегодня</strong>
+        </span>
+        <label class="sr-only" for="quickAddInput">Быстро добавить задачу на выбранный день</label>
+        <input class="quick-add-input" id="quickAddInput" name="quickTask" type="text" maxlength="140" autocomplete="off" placeholder="Что нужно сделать?" required>
+        <button class="pixel-btn quick-add-btn" type="submit" aria-label="Добавить быстрое дело на выбранный день">
+          <svg class="icon"><use href="#i-plus"></use></svg>
+          <span>Добавить</span>
+        </button>
+      </form>
+
+      <section class="calendar-card" aria-labelledby="periodTitle">
+        <div class="calendar-head">
+          <div class="period-copy">
+            <p class="period-kicker" id="periodKicker">Месячный вид</p>
+            <h2 id="periodTitle">Ноябрь 2026</h2>
+          </div>
+
+          <div class="progress-card" id="progressCard" aria-live="polite">
+            <div class="progress-top">
+              <span class="progress-label">Выполнено</span>
+              <span class="progress-value" id="progressValue">0 / 0</span>
+            </div>
+            <div class="progress-track" aria-hidden="true"><span id="progressBar"></span></div>
+            <p class="progress-note" id="progressNote">Пока нет задач</p>
+          </div>
+        </div>
+
+        <div class="calendar-tip">
+          <span class="tip-cube" aria-hidden="true"></span>
+          <span>Нажми на день, чтобы открыть сундук с задачами. Дела можно перетаскивать между днями.</span>
+        </div>
+
+        <div class="calendar-view" id="calendarView"></div>
+      </section>
+
+      <footer class="panel-footer">
+        <p class="save-note"><span class="save-dot" aria-hidden="true"></span> Всё сохраняется автоматически в этом браузере</p>
+        <p class="pixel-signature">Данные, праздники и Google Календарь — в настройках</p>
+      </footer>
+    </main>
+
+    <footer class="page-footer">
+      <p>Пиксельный календарь на 2027 год</p>
+      <div class="footer-flowers" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+      <p>Мечтай. Планируй. Собирай.</p>
+    </footer>
+  </div>
+
+  <dialog class="day-dialog" id="dayDialog" aria-labelledby="dialogTitle">
+    <div class="dialog-card">
+      <header class="dialog-head">
+        <div class="dialog-heading">
+          <p class="dialog-eyebrow" id="dialogEyebrow">Понедельник</p>
+          <h3 id="dialogTitle">9 ноября 2026</h3>
+        </div>
+        <button class="dialog-close" id="dialogCloseBtn" type="button" aria-label="Закрыть окно дня">
+          <svg class="icon"><use href="#i-close"></use></svg>
+        </button>
+      </header>
+
+      <div class="dialog-body">
+        <div class="day-summary">
+          <div class="day-summary-info">
+            <span class="summary-label">План на день</span>
+            <strong id="daySummaryText">Пока пусто</strong>
+          </div>
+          <div class="day-progress" aria-hidden="true">
+            <span id="dayProgressBar"></span>
+          </div>
+        </div>
+
+        <ul class="task-list" id="taskList" aria-label="Задачи на день"></ul>
+
+        <form class="add-form" id="taskForm" novalidate>
+          <div class="add-row">
+            <label class="sr-only" for="taskInput">Новая задача</label>
+            <input class="task-input" id="taskInput" name="task" type="text" maxlength="140" autocomplete="off" placeholder="Новое дело для этого дня..." required>
+            <button class="pixel-btn add-btn" type="submit" aria-label="Добавить задачу">
+              <svg class="icon"><use href="#i-plus"></use></svg>
+              <span>Добавить</span>
+            </button>
+          </div>
+          <div class="add-options">
+            <label class="repeat-field" for="taskRepeat">
+              <span>Повтор</span>
+              <select class="task-select" id="taskRepeat" name="repeat">
+                <option value="none">Не повторять</option>
+                <option value="daily">Каждый день</option>
+                <option value="weekdays">По будням</option>
+                <option value="weekly">Каждую неделю</option>
+                <option value="monthly">Каждый месяц</option>
+              </select>
+            </label>
+            <label class="repeat-field repeat-end" id="repeatEndWrap" for="taskRepeatEnd" hidden>
+              <span>До</span>
+              <input class="task-date" id="taskRepeatEnd" name="repeatEnd" type="date">
+            </label>
+            <p class="repeat-hint" id="repeatHint">Повторяющиеся дела видны во всех подходящих днях.</p>
+          </div>
+        </form>
+        <p class="form-error" id="formError" role="alert"></p>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="tool-dialog search-dialog" id="searchDialog" aria-labelledby="searchTitle">
+    <div class="dialog-card">
+      <header class="dialog-head">
+        <div class="dialog-heading">
+          <p class="dialog-eyebrow">Поиск по всем дням</p>
+          <h3 id="searchTitle">Найти дело</h3>
+        </div>
+        <button class="dialog-close" id="searchCloseBtn" type="button" aria-label="Закрыть поиск">
+          <svg class="icon"><use href="#i-close"></use></svg>
+        </button>
+      </header>
+      <div class="dialog-body tool-body">
+        <div class="search-bar">
+          <svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>
+          <label class="sr-only" for="searchInput">Поиск задач по названию</label>
+          <input class="search-input" id="searchInput" type="search" autocomplete="off" placeholder="Например: подарок, зарядка, встреча...">
+        </div>
+
+        <div class="filter-row" id="searchStatus" role="group" aria-label="Фильтр по статусу">
+          <button class="filter-chip is-active" type="button" data-status="all" aria-pressed="true">Все</button>
+          <button class="filter-chip" type="button" data-status="active" aria-pressed="false">В планах</button>
+          <button class="filter-chip" type="button" data-status="done" aria-pressed="false">Готово</button>
+        </div>
+
+        <div class="search-options">
+          <label class="search-type-label" for="searchType">Тип</label>
+          <select class="task-select search-type" id="searchType">
+            <option value="all">Все дела</option>
+            <option value="task">Обычные</option>
+            <option value="series">Повторяющиеся</option>
+          </select>
+          <span class="search-count" id="searchCount">Введи запрос</span>
+        </div>
+
+        <ul class="search-results" id="searchResults" aria-label="Результаты поиска"></ul>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="tool-dialog settings-dialog" id="settingsDialog" aria-labelledby="settingsTitle">
+    <div class="dialog-card">
+      <header class="dialog-head">
+        <div class="dialog-heading">
+          <p class="dialog-eyebrow">Настройки</p>
+          <h3 id="settingsTitle">Данные и приложение</h3>
+        </div>
+        <button class="dialog-close" id="settingsCloseBtn" type="button" aria-label="Закрыть настройки">
+          <svg class="icon"><use href="#i-close"></use></svg>
+        </button>
+      </header>
+      <div class="dialog-body tool-body settings-body">
+        <section class="settings-section">
+          <h4 class="settings-title">Календарь</h4>
+          <label class="toggle-row">
+            <input type="checkbox" id="holidaysToggle" checked>
+            <span class="toggle-mark" aria-hidden="true"></span>
+            <span>Показывать государственные праздники</span>
+          </label>
+          <p class="settings-note">Праздники отмечаются звёздочкой в календаре и подписью в окне дня.</p>
+        </section>
+
+        <section class="settings-section">
+          <h4 class="settings-title">Резервная копия</h4>
+          <p class="settings-note">Сохрани дела в JSON, чтобы перенести их на другое устройство или восстановить после очистки браузера.</p>
+          <div class="settings-actions">
+            <button class="pixel-btn settings-btn" id="exportJsonBtn" type="button">
+              <svg class="icon"><use href="#i-download"></use></svg>
+              <span>Экспорт JSON</span>
+            </button>
+            <button class="pixel-btn settings-btn" id="importJsonBtn" type="button">
+              <svg class="icon"><use href="#i-upload"></use></svg>
+              <span>Импорт JSON</span>
+            </button>
+            <input type="file" id="importFile" accept=".json,application/json" hidden>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <h4 class="settings-title">Google Календарь</h4>
+          <p class="settings-note">Скачай файл .ics и импортируй его в Google Календарь: «Настройки → Импорт и экспорт». Повторяющиеся дела станут сериями событий. Отдельное дело можно отправить в Google кнопкой календаря в списке задач.</p>
+          <div class="settings-actions">
+            <button class="pixel-btn settings-btn" id="exportIcsBtn" type="button">
+              <svg class="icon"><use href="#i-download"></use></svg>
+              <span>Скачать .ics</span>
+            </button>
+            <a class="pixel-btn settings-btn link-btn" href="https://calendar.google.com/calendar/r" target="_blank" rel="noopener">
+              <svg class="icon"><use href="#i-external"></use></svg>
+              <span>Открыть Google</span>
+            </a>
+          </div>
+          <p class="settings-note settings-warning">Прямая двусторонняя синхронизация требует OAuth и сервера, поэтому офлайн-версия работает через импорт и экспорт.</p>
+        </section>
+
+        <section class="settings-section">
+          <h4 class="settings-title">Приложение и виджет</h4>
+          <p class="settings-note">Установи календарь как приложение (PWA) или открой компактный мини-виджет «Сегодня». Настоящий виджет на главном экране Android появится в APK-версии.</p>
+          <div class="settings-actions">
+            <a class="pixel-btn settings-btn link-btn" href="widget.html">
+              <svg class="icon"><use href="#i-widget"></use></svg>
+              <span>Открыть виджет</span>
+            </a>
+            <button class="pixel-btn settings-btn" id="installBtn" type="button" hidden>
+              <svg class="icon"><use href="#i-download"></use></svg>
+              <span>Установить приложение</span>
+            </button>
+          </div>
+          <p class="settings-note" id="installNote">Если браузер поддерживает установку, кнопка появится автоматически.</p>
+        </section>
+
+        <section class="settings-section settings-danger">
+          <h4 class="settings-title">Очистить данные</h4>
+          <p class="settings-note">Удаляет все дела и повторяющиеся серии из этого браузера. Отменить это действие нельзя.</p>
+          <button class="pixel-btn danger-btn" id="clearDataBtn" type="button">
+            <svg class="icon"><use href="#i-trash"></use></svg>
+            <span>Удалить все задачи</span>
+          </button>
+        </section>
+
+        <p class="settings-meta" id="settingsMeta">0 задач · 0 серий</p>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite">
+    <span class="toast-cube" aria-hidden="true"></span>
+    <span id="toastText">Сохранено</span>
+  </div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

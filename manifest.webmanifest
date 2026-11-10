@@ -1,0 +1,49 @@
+{
+  "name": "Пиксельный календарь 2027",
+  "short_name": "Календарь",
+  "description": "Милый пиксельный календарь с задачами по дням, повторами, поиском и мини-виджетом.",
+  "lang": "ru",
+  "dir": "ltr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "any",
+  "background_color": "#e9ffd6",
+  "theme_color": "#8bd8ff",
+  "categories": ["productivity", "lifestyle"],
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Сегодня",
+      "short_name": "Сегодня",
+      "url": "./index.html",
+      "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Мини-виджет",
+      "short_name": "Виджет",
+      "url": "./widget.html",
+      "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}

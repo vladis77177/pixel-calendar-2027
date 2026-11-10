@@ -1,0 +1,11 @@
+{
+  "appId": "ru.pixel.calendar2027",
+  "appName": "Пиксельный календарь",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

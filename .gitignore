@@ -1,0 +1,10 @@
+# Сгенерированные артефакты (только в корне проекта)
+/node_modules/
+/www/
+/android/
+/dist/
+.gradle/
+local.properties
+*.log
+.DS_Store
+*.apk

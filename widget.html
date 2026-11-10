@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#8bd8ff">
+  <meta name="description" content="Мини-виджет пиксельного календаря: план на сегодня и быстрые дела.">
+  <title>Сегодня · Пиксельный календарь</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Календарь">
+  <link rel="stylesheet" href="widget.css">
+</head>
+<body>
+  <div class="widget-sky" aria-hidden="true">
+    <span class="widget-sun"></span>
+    <span class="widget-cloud cloud-one"></span>
+    <span class="widget-cloud cloud-two"></span>
+  </div>
+
+  <main class="widget-shell">
+    <header class="widget-top">
+      <div class="widget-brand">
+        <span class="widget-logo" aria-hidden="true">
+          <svg viewBox="0 0 16 16" shape-rendering="crispEdges">
+            <rect width="16" height="16" fill="#3a2718"/>
+            <rect x="1" y="1" width="14" height="14" fill="#80522e"/>
+            <rect x="1" y="1" width="14" height="5" fill="#5fb947"/>
+            <rect x="1" y="1" width="14" height="2" fill="#8ee06e"/>
+            <rect x="3" y="9" width="2" height="2" fill="#694021"/>
+            <rect x="8" y="10" width="3" height="2" fill="#956237"/>
+            <rect x="12" y="12" width="2" height="2" fill="#694021"/>
+          </svg>
+        </span>
+        <span>
+          <span class="widget-eyebrow">Пиксельный календарь</span>
+          <span class="widget-title">Сегодня</span>
+        </span>
+      </div>
+      <a class="widget-home" href="index.html" aria-label="Открыть полный календарь">
+        <span aria-hidden="true">↗</span>
+      </a>
+    </header>
+
+    <section class="widget-date-card" aria-labelledby="widgetDateLabel">
+      <p class="widget-weekday" id="widgetWeekday">Понедельник</p>
+      <div class="widget-date-line">
+        <strong class="widget-day" id="widgetDay">9</strong>
+        <span class="widget-month" id="widgetMonth">ноября</span>
+        <span class="widget-year" id="widgetYear">2026</span>
+      </div>
+      <p class="widget-holiday" id="widgetHoliday" hidden></p>
+      <p class="widget-clock" id="widgetClock">--:--</p>
+      <span class="widget-date-label" id="widgetDateLabel">9 ноября 2026</span>
+    </section>
+
+    <section class="widget-plan" aria-label="Прогресс на сегодня">
+      <div class="widget-plan-head">
+        <span>План на сегодня</span>
+        <strong id="widgetProgress">0 / 0</strong>
+      </div>
+      <div class="widget-bar" aria-hidden="true"><span id="widgetBar"></span></div>
+    </section>
+
+    <ul class="widget-tasks" id="widgetTasks" aria-label="Задачи на сегодня"></ul>
+
+    <form class="widget-add" id="widgetForm" novalidate>
+      <label class="sr-only" for="widgetInput">Новая задача на сегодня</label>
+      <input id="widgetInput" type="text" maxlength="140" autocomplete="off" placeholder="Добавить дело на сегодня...">
+      <button type="submit" aria-label="Добавить задачу на сегодня">+</button>
+    </form>
+
+    <footer class="widget-footer">
+      <span class="widget-save"><span aria-hidden="true"></span> Сохраняется автоматически</span>
+      <a href="index.html">Весь календарь →</a>
+    </footer>
+  </main>
+
+  <div class="widget-toast" id="widgetToast" role="status" aria-live="polite"></div>
+
+  <script src="widget.js" defer></script>
+</body>
+</html>
