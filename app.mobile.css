@@ -66,11 +66,12 @@ html[data-profile="mobile"] .dialog-card {
   }
 }
 
-/* Открытие диалога: короткий сдвиг вместо 0.22s с opacity и scale. */
+/* Открытие диалога: короткий сдвиг вместо 0.22s с opacity и scale.
+   Кривая плавная: steps(2) читался как рывок, хотя кадры не проваливались. */
 html[data-profile="mobile"] .day-dialog[open] .dialog-card,
 html[data-profile="mobile"] .tool-dialog[open] .dialog-card {
-  animation-duration: 0.14s;
-  animation-timing-function: steps(2, end);
+  animation-duration: 0.16s;
+  animation-timing-function: cubic-bezier(0.2, 0.9, 0.25, 1);
 }
 
 /* Отдельный выключатель анимации окон (data-dialog-anim из applyProfile).
