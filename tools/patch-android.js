@@ -226,6 +226,18 @@ if (keystorePropertiesFile.exists()) {
   console.log("Signing config already present in app/build.gradle");
 }
 
+// Version: keep Android versionName/versionCode in sync with package.json.
+const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+const versionName = pkg.version;
+const versionCode = Math.max(1, Math.round(Number(versionName.split(".")[0]) * 100
+  + Number(versionName.split(".")[1] || 0)));
+let versioned = fs.readFileSync(gradleFile, "utf8");
+versioned = versioned
+  .replace(/versionCode \d+/, `versionCode ${versionCode}`)
+  .replace(/versionName "[^"]*"/, `versionName "${versionName}"`);
+fs.writeFileSync(gradleFile, versioned);
+console.log(`Android version: ${versionName} (${versionCode})`);
+
 console.log(`Android project patched for ${PACKAGE}`);
 console.log(`MainActivity: ${path.relative(ROOT, mainActivity)}`);
 console.log("Widget receiver, icons and splash screens are ready.");

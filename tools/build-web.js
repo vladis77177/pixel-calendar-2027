@@ -29,12 +29,12 @@ for (const file of FILES) {
 // Build info: commit hash and date are baked into www/index.html so the settings
 // dialog can show exactly which build is installed on the phone.
 const sha = (process.env.GITHUB_SHA || "").slice(0, 7);
-const buildInfo = sha
-  ? JSON.stringify({
-    commit: sha,
-    date: new Date().toISOString().slice(0, 10)
-  })
-  : JSON.stringify({ commit: "dev", date: new Date().toISOString().slice(0, 10) });
+const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
+const buildInfo = JSON.stringify({
+  version: pkg.version,
+  commit: sha || "dev",
+  date: new Date().toISOString().slice(0, 10)
+});
 
 const builtIndex = path.join(OUT, "index.html");
 const html = fs.readFileSync(builtIndex, "utf8").replace(

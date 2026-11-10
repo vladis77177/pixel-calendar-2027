@@ -1673,7 +1673,8 @@
   function buildLabel() {
     const info = window.__BUILD_INFO__;
     if (!info || !info.commit) return "локальная";
-    return info.date ? `${info.commit} · ${info.date}` : info.commit;
+    const version = info.version ? `v${info.version} · ` : "";
+    return info.date ? `${version}${info.commit} · ${info.date}` : `${version}${info.commit}`;
   }
 
   function nextFrame() {

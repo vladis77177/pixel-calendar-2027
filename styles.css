@@ -368,10 +368,10 @@ html[data-daytime="night"] .cloud {
 
 .garland {
   position: absolute;
-  top: 3px;
-  left: 14px;
-  right: 14px;
-  height: 14px;
+  top: 4px;
+  left: 12px;
+  right: 12px;
+  height: 18px;
   display: none;
   pointer-events: none;
   z-index: 3;
@@ -381,6 +381,7 @@ html[data-daytime="night"] .cloud {
   display: block;
   width: 100%;
   height: 100%;
+  overflow: visible;
 }
 
 html[data-holiday="on"] .garland {
@@ -388,7 +389,7 @@ html[data-holiday="on"] .garland {
 }
 
 html[data-holiday="on"] .game-panel {
-  padding-top: clamp(20px, 2.8vw, 30px);
+  padding-top: clamp(26px, 3vw, 36px);
 }
 
 html[data-holiday="on"][data-decor="off"] .garland {
@@ -397,6 +398,30 @@ html[data-holiday="on"][data-decor="off"] .garland {
 
 html[data-daytime="night"] .garland {
   filter: drop-shadow(0 0 5px rgba(255, 214, 120, 0.45));
+}
+
+/* ——— Ночью бумага темнее, чтобы не слепило ———
+   Множительная подложка поверх панелей гасит яркость крема, не трогая
+   пиксельные тени и градиенты: текст и фон темнеют вместе, контраст держится. */
+
+html[data-daytime="night"] .game-panel,
+html[data-daytime="night"] .dialog-card,
+html[data-daytime="night"] .brand-copy,
+html[data-daytime="night"] .today-chip {
+  position: relative;
+}
+
+html[data-daytime="night"] .game-panel::after,
+html[data-daytime="night"] .dialog-card::after,
+html[data-daytime="night"] .brand-copy::after,
+html[data-daytime="night"] .today-chip::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: #a3947c;
+  mix-blend-mode: multiply;
+  pointer-events: none;
 }
 
 .winter-tree {
