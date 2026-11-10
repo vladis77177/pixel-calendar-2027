@@ -1467,6 +1467,9 @@ html[data-profile="full"] .day-dialog::backdrop {
     0 8px 0 var(--line),
     0 24px 60px rgba(20, 38, 19, 0.38),
     inset 0 0 0 3px rgba(255, 255, 255, 0.38);
+  /* Слой создаётся заранее: анимация открытия не заставляет перерисовывать
+     карточку с тенью и тайловым фоном на каждом кадре. */
+  will-change: transform;
 }
 
 .day-dialog[open] .dialog-card {
@@ -2054,12 +2057,10 @@ html[data-profile="full"] .day-dialog::backdrop {
 
 @keyframes dialog-pop {
   from {
-    opacity: 0;
-    transform: translateY(16px) scale(0.98);
+    transform: translateY(10px);
   }
   to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
@@ -2381,7 +2382,7 @@ html[data-profile="full"] .day-dialog::backdrop {
     border-left: 0;
     box-shadow:
       0 -8px 0 var(--line),
-      0 -20px 60px rgba(20, 38, 19, 0.35);
+      0 -8px 22px rgba(20, 38, 19, 0.32);
   }
 
   .day-dialog[open] .dialog-card {
@@ -2395,11 +2396,9 @@ html[data-profile="full"] .day-dialog::backdrop {
 
 @keyframes dialog-sheet-in {
   from {
-    opacity: 0;
-    transform: translateY(40px);
+    transform: translateY(28px);
   }
   to {
-    opacity: 1;
     transform: translateY(0);
   }
 }
@@ -3285,7 +3284,7 @@ html[data-profile="full"] .tool-dialog::backdrop {
     border-left: 0;
     box-shadow:
       0 -8px 0 var(--line),
-      0 -20px 60px rgba(20, 38, 19, 0.35);
+      0 -8px 22px rgba(20, 38, 19, 0.32);
   }
 
   .tool-dialog[open] .dialog-card {

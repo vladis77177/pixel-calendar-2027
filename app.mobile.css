@@ -55,7 +55,22 @@ html[data-profile="mobile"] .tool-dialog::backdrop {
 html[data-profile="mobile"] .dialog-card {
   box-shadow:
     0 6px 0 var(--line),
-    0 10px 22px rgba(20, 38, 19, 0.32);
+    0 8px 18px rgba(20, 38, 19, 0.32);
+}
+
+@media (max-width: 760px) {
+  html[data-profile="mobile"] .dialog-card {
+    box-shadow:
+      0 -8px 0 var(--line),
+      0 -4px 12px rgba(20, 38, 19, 0.30);
+  }
+}
+
+/* Открытие диалога: короткий сдвиг вместо 0.22s с opacity и scale. */
+html[data-profile="mobile"] .day-dialog[open] .dialog-card,
+html[data-profile="mobile"] .tool-dialog[open] .dialog-card {
+  animation-duration: 0.14s;
+  animation-timing-function: steps(2, end);
 }
 
 /* ——— Плотность ——— */
