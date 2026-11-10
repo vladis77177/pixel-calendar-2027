@@ -20,6 +20,8 @@
   <a class="skip-link" href="#calendarSection">Перейти к календарю</a>
 
   <div class="world" aria-hidden="true">
+    <div class="stars"></div>
+    <div class="moon"></div>
     <div class="sun"></div>
     <div class="cloud cloud-a"><i></i><i></i><i></i></div>
     <div class="cloud cloud-b"><i></i><i></i><i></i></div>
@@ -398,6 +400,16 @@
             <select id="weekStartSelect">
               <option value="1">Понедельник</option>
               <option value="0">Воскресенье</option>
+            </select>
+          </div>
+          <div class="settings-field">
+            <label for="skySelect">Небо</label>
+            <select id="skySelect">
+              <option value="auto">По времени суток</option>
+              <option value="day">Всегда день</option>
+              <option value="dawn">Всегда рассвет</option>
+              <option value="dusk">Всегда закат</option>
+              <option value="night">Всегда ночь</option>
             </select>
           </div>
           <label class="toggle-row">

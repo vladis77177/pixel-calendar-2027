@@ -7,6 +7,13 @@
   const DENSITIES = ["comfortable", "compact"];
   const MOTION_MODES = ["auto", "on", "off"];
   const DIALOG_ANIM_MODES = ["auto", "on", "off"];
+  const SKY_MODES = ["auto", "day", "dawn", "dusk", "night"];
+  const THEME_COLORS = {
+    day: "#8bd8ff",
+    dawn: "#f2a5a0",
+    dusk: "#e2886a",
+    night: "#101a33"
+  };
   const DEFAULT_SETTINGS = {
     showHolidays: true,
     profile: "auto",
@@ -14,6 +21,7 @@
     motion: "auto",
     dialogAnimation: "auto",
     decor: true,
+    sky: "auto",
     weekStart: 1
   };
   const REPEATS = ["none", "daily", "weekdays", "weekly", "monthly"];
@@ -110,6 +118,7 @@
     motionSelect: document.getElementById("motionSelect"),
     dialogAnimSelect: document.getElementById("dialogAnimSelect"),
     weekStartSelect: document.getElementById("weekStartSelect"),
+    skySelect: document.getElementById("skySelect"),
     decorToggle: document.getElementById("decorToggle"),
     settingsBuild: document.getElementById("settingsBuild"),
     perfBtn: document.getElementById("perfBtn"),
@@ -355,6 +364,7 @@
           ? rawSettings.dialogAnimation
           : DEFAULT_SETTINGS.dialogAnimation,
         decor: rawSettings.decor !== false,
+        sky: SKY_MODES.includes(rawSettings.sky) ? rawSettings.sky : DEFAULT_SETTINGS.sky,
         weekStart: rawSettings.weekStart === 0 ? 0 : 1
       }
     };
@@ -1634,6 +1644,7 @@
     els.dialogAnimSelect.value = state.settings.dialogAnimation;
     els.decorToggle.checked = state.settings.decor;
     els.weekStartSelect.value = String(state.settings.weekStart);
+    els.skySelect.value = state.settings.sky;
   }
 
   function openSettings() {
@@ -2201,6 +2212,12 @@
       renderAll(false);
     });
 
+    els.skySelect.addEventListener("change", () => {
+      state.settings.sky = SKY_MODES.includes(els.skySelect.value) ? els.skySelect.value : "auto";
+      saveStore();
+      applyDaytime();
+    });
+
     els.exportJsonBtn.addEventListener("click", exportJson);
     els.exportIcsBtn.addEventListener("click", exportICS);
     els.importJsonBtn.addEventListener("click", () => els.importFile.click());
@@ -2265,7 +2282,14 @@
       }
     });
 
-    window.setInterval(refreshAtMidnight, 30000);
+    window.setInterval(() => {
+      refreshAtMidnight();
+      applyDaytime();
+    }, 30000);
+
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) applyDaytime();
+    });
   }
 
   function closeToolSearch() {
@@ -2306,6 +2330,27 @@
     );
   }
 
+  // Фаза суток: 5–8 рассвет, 8–17 день, 17–21 закат, иначе ночь.
+  function resolveDaytime() {
+    const mode = state.settings.sky;
+    if (mode !== "auto") return SKY_MODES.includes(mode) ? mode : "day";
+    const now = new Date();
+    const hour = now.getHours() + now.getMinutes() / 60;
+    if (hour >= 5 && hour < 8) return "dawn";
+    if (hour >= 8 && hour < 17) return "day";
+    if (hour >= 17 && hour < 21) return "dusk";
+    return "night";
+  }
+
+  function applyDaytime() {
+    const phase = resolveDaytime();
+    const root = document.documentElement;
+    if (root.dataset.daytime === phase) return;
+    root.dataset.daytime = phase;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", THEME_COLORS[phase] || THEME_COLORS.day);
+  }
+
   // Анимация окон: auto = включена везде, кроме мобильного профиля.
   function resolveDialogAnimation(profile) {
     const mode = state.settings.dialogAnimation;
@@ -2331,6 +2376,7 @@
 
   function init() {
     applyProfile();
+    applyDaytime();
     updateTodayLabel();
     bindEvents();
     setupInstall();
