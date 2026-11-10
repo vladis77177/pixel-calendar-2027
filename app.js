@@ -8,6 +8,7 @@
   const MOTION_MODES = ["auto", "on", "off"];
   const DIALOG_ANIM_MODES = ["auto", "on", "off"];
   const SKY_MODES = ["auto", "day", "dawn", "dusk", "night"];
+  const HOLIDAY_MODES = ["auto", "on", "off"];
   const THEME_COLORS = {
     day: "#8bd8ff",
     dawn: "#f2a5a0",
@@ -22,6 +23,7 @@
     dialogAnimation: "auto",
     decor: true,
     sky: "auto",
+    holiday: "auto",
     weekStart: 1
   };
   const REPEATS = ["none", "daily", "weekdays", "weekly", "monthly"];
@@ -119,6 +121,8 @@
     dialogAnimSelect: document.getElementById("dialogAnimSelect"),
     weekStartSelect: document.getElementById("weekStartSelect"),
     skySelect: document.getElementById("skySelect"),
+    holidaySelect: document.getElementById("holidaySelect"),
+    snow: document.querySelector(".snow"),
     decorToggle: document.getElementById("decorToggle"),
     settingsBuild: document.getElementById("settingsBuild"),
     perfBtn: document.getElementById("perfBtn"),
@@ -365,6 +369,7 @@
           : DEFAULT_SETTINGS.dialogAnimation,
         decor: rawSettings.decor !== false,
         sky: SKY_MODES.includes(rawSettings.sky) ? rawSettings.sky : DEFAULT_SETTINGS.sky,
+        holiday: HOLIDAY_MODES.includes(rawSettings.holiday) ? rawSettings.holiday : DEFAULT_SETTINGS.holiday,
         weekStart: rawSettings.weekStart === 0 ? 0 : 1
       }
     };
@@ -1645,6 +1650,7 @@
     els.decorToggle.checked = state.settings.decor;
     els.weekStartSelect.value = String(state.settings.weekStart);
     els.skySelect.value = state.settings.sky;
+    els.holidaySelect.value = state.settings.holiday;
   }
 
   function openSettings() {
@@ -2218,6 +2224,14 @@
       applyDaytime();
     });
 
+    els.holidaySelect.addEventListener("change", () => {
+      state.settings.holiday = HOLIDAY_MODES.includes(els.holidaySelect.value)
+        ? els.holidaySelect.value
+        : "auto";
+      saveStore();
+      applyHoliday();
+    });
+
     els.exportJsonBtn.addEventListener("click", exportJson);
     els.exportIcsBtn.addEventListener("click", exportICS);
     els.importJsonBtn.addEventListener("click", () => els.importFile.click());
@@ -2285,10 +2299,14 @@
     window.setInterval(() => {
       refreshAtMidnight();
       applyDaytime();
+      applyHoliday();
     }, 30000);
 
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) applyDaytime();
+      if (!document.hidden) {
+        applyDaytime();
+        applyHoliday();
+      }
     });
   }
 
@@ -2351,6 +2369,48 @@
     if (meta) meta.setAttribute("content", THEME_COLORS[phase] || THEME_COLORS.day);
   }
 
+  // Новогодняя тема: auto = декабрь и январь.
+  function resolveHoliday() {
+    const mode = state.settings.holiday;
+    if (mode === "on") return true;
+    if (mode === "off") return false;
+    const month = new Date().getMonth();
+    return month === 11 || month === 0;
+  }
+
+  function applyHoliday() {
+    document.documentElement.dataset.holiday = resolveHoliday() ? "on" : "off";
+    renderSnow();
+  }
+
+  // Снежинки создаём только когда тема активна, декор включён и анимации не выключены.
+  function renderSnow() {
+    if (!els.snow) return;
+    const root = document.documentElement;
+    const active = root.dataset.holiday === "on"
+      && root.dataset.decor === "on"
+      && root.dataset.motion !== "off";
+    if (!active) {
+      if (els.snow.childElementCount) els.snow.replaceChildren();
+      return;
+    }
+    const count = root.dataset.profile === "mobile" ? 14 : 26;
+    if (els.snow.childElementCount === count) return;
+
+    const fragment = document.createDocumentFragment();
+    for (let index = 0; index < count; index += 1) {
+      const flake = document.createElement("span");
+      flake.className = "snowflake";
+      flake.style.setProperty("--x", `${(index * 37 + 5) % 100}%`);
+      flake.style.setProperty("--size", `${2 + (index % 3)}px`);
+      flake.style.setProperty("--duration", `${9 + (index % 7) * 2}s`);
+      flake.style.setProperty("--delay", `-${((index * 1.7) % 18).toFixed(1)}s`);
+      flake.style.setProperty("--drift", `${((index % 5) - 2) * 16}px`);
+      fragment.appendChild(flake);
+    }
+    els.snow.replaceChildren(fragment);
+  }
+
   // Анимация окон: auto = включена везде, кроме мобильного профиля.
   function resolveDialogAnimation(profile) {
     const mode = state.settings.dialogAnimation;
@@ -2372,11 +2432,13 @@
     root.dataset.motion = state.settings.motion === "off" ? "off" : "on";
     root.dataset.decor = state.settings.decor ? "on" : "off";
     root.dataset.dialogAnim = resolveDialogAnimation(profile) ? "on" : "off";
+    renderSnow();
   }
 
   function init() {
     applyProfile();
     applyDaytime();
+    applyHoliday();
     updateTodayLabel();
     bindEvents();
     setupInstall();

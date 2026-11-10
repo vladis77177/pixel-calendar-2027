@@ -42,6 +42,20 @@
       <span class="pixel-flower flower-c"></span>
       <span class="pixel-mushroom"></span>
     </div>
+    <div class="winter-tree" aria-hidden="true">
+      <svg viewBox="0 0 20 28" shape-rendering="crispEdges">
+        <rect x="8" y="21" width="4" height="6" fill="#7a4a28"/>
+        <rect x="7" y="3" width="6" height="3" fill="#3f8f3a"/>
+        <rect x="5" y="6" width="10" height="4" fill="#4aa844"/>
+        <rect x="3" y="10" width="14" height="5" fill="#3f8f3a"/>
+        <rect x="6" y="15" width="8" height="6" fill="#4aa844"/>
+        <rect x="9" y="1" width="2" height="2" fill="#ffd45f"/>
+        <rect x="6" y="7" width="2" height="2" fill="#ffe97a"/>
+        <rect x="12" y="11" width="2" height="2" fill="#ff7f9c"/>
+        <rect x="8" y="16" width="2" height="2" fill="#7fe0ff"/>
+        <rect x="4" y="13" width="2" height="2" fill="#ffd45f"/>
+      </svg>
+    </div>
   </div>
 
   <svg class="svg-sprite" aria-hidden="true" focusable="false">
@@ -91,8 +105,7 @@
       <path d="m15 15 5 5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"/>
     </symbol>
     <symbol id="i-settings" viewBox="0 0 24 24">
-      <path d="M10 3h4l1 3 3 1 2-2 3 3-2 2 1 3 3 1v4l-3 1-1 3 2 2-3 3-2-2-3 1-1 3h-4l-1-3-3-1-2 2-3-3 2-2-1-3-3-1V10l3-1 1-3-2-2 3-3 2 2 3-1 1-3Z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="miter"/>
-      <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2.2"/>
+      <path fill="currentColor" fill-rule="evenodd" d="M9 1h2v5H9zM13 1h2v5h-2zM9 18h2v5H9zM13 18h2v5h-2zM1 9h5v2H1zM1 13h5v2H1zM18 9h5v2h-5zM18 13h5v2h-5zM6 6h12v12H6zM10 10h4v4h-4z"/>
     </symbol>
     <symbol id="i-widget" viewBox="0 0 24 24">
       <rect x="4" y="4" width="7" height="7" fill="currentColor"/>
@@ -150,6 +163,20 @@
 
     <main class="game-panel" id="calendarSection">
       <div class="panel-shine" aria-hidden="true"></div>
+      <div class="garland" aria-hidden="true">
+        <svg focusable="false" aria-hidden="true">
+          <defs>
+            <pattern id="garland-bulbs" width="88" height="14" patternUnits="userSpaceOnUse">
+              <rect x="0" y="0" width="88" height="2" fill="#3a291b"/>
+              <circle cx="3" cy="6" r="3" fill="#ff5a6e"/>
+              <circle cx="25" cy="6" r="3" fill="#ffd45f"/>
+              <circle cx="47" cy="6" r="3" fill="#6ee0ff"/>
+              <circle cx="69" cy="6" r="3" fill="#8ef07a"/>
+            </pattern>
+          </defs>
+          <rect x="0" y="0" width="100%" height="14" fill="url(#garland-bulbs)"/>
+        </svg>
+      </div>
 
       <div class="toolbar">
         <div class="view-switcher" role="group" aria-label="Вид календаря">
@@ -417,6 +444,14 @@
             <span class="toggle-mark" aria-hidden="true"></span>
             <span>Декор: солнце, облака, острова</span>
           </label>
+          <div class="settings-field">
+            <label for="holidaySelect">Новогодняя тема</label>
+            <select id="holidaySelect">
+              <option value="auto">Авто (декабрь–январь)</option>
+              <option value="on">Всегда включена</option>
+              <option value="off">Выключена</option>
+            </select>
+          </div>
           <p class="settings-note">Мобильный профиль отключает размытие подложки и тяжёлые тени, поэтому меню открываются плавнее. «Авто» выбирает его сам на Android.</p>
         </section>
 
@@ -503,6 +538,8 @@
     <span class="toast-cube" aria-hidden="true"></span>
     <span id="toastText">Сохранено</span>
   </div>
+
+  <div class="snow" aria-hidden="true"></div>
 
   <script src="app.js" defer></script>
 </body>
