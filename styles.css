@@ -1149,11 +1149,11 @@ html[data-holiday="on"] .island-grass {
 
 .period-copy h2 {
   margin: 0;
-  font-family: var(--font-pixel);
+  font-family: var(--font-num);
   font-size: clamp(28px, 4vw, 39px);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0.005em;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: 0;
   color: #322213;
   text-shadow: 2px 2px 0 rgba(255, 255, 255, 0.65);
 }
@@ -1177,9 +1177,10 @@ html[data-holiday="on"] .island-grass {
 }
 
 .progress-label {
-  font-family: var(--font-pixel);
+  font-family: var(--font-num);
   font-size: 11px;
-  letter-spacing: 0.07em;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #77603e;
 }
@@ -3675,8 +3676,15 @@ html[data-profile="full"] .tool-dialog::backdrop {
 
 .settings-btn {
   min-height: 38px;
-  padding: 7px 10px;
-  font-size: 13px;
+  min-width: 0;
+  padding: 7px 9px;
+  font-size: 12.5px;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.settings-btn span {
+  min-width: 0;
 }
 
 .settings-btn .icon {
@@ -4326,5 +4334,13 @@ html[data-profile="full"] .tool-dialog::backdrop {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Кнопки настроек: длинные подписи не должны вылезать за рамку. */
+@media (max-width: 760px) {
+  .settings-actions .settings-btn {
+    flex: 1 1 100%;
+    font-size: 13px;
   }
 }
