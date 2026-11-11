@@ -22,7 +22,19 @@ function state(tasks, series, settings) {
     view: "month",
     tasks: tasks || {},
     series: series || [],
-    settings: { showHolidays: true, weekStart: 1, updatedAt: 0, ...(settings || {}) }
+    settings: {
+      showHolidays: true,
+      profile: "auto",
+      density: "comfortable",
+      motion: "auto",
+      dialogAnimation: "auto",
+      decor: true,
+      sky: "auto",
+      holiday: "auto",
+      weekStart: 1,
+      updatedAt: 0,
+      ...(settings || {})
+    }
   };
 }
 
@@ -165,6 +177,19 @@ test("слияние идемпотентно и не зависит от пор
   assert.deepEqual(mergeStates(once, b), once);
   assert.deepEqual(mergeStates(once, once), once);
   assert.deepEqual(mergeStates(a, a), { ...a });
+});
+
+test("пустые настройки сервера не обнуляют интерфейс", () => {
+  const local = state({}, [], { updatedAt: 0 });
+  const remote = { version: 3, view: "month", tasks: {}, series: [], settings: { updatedAt: 0 } };
+  const merged = mergeStates(local, remote);
+  assert.equal(merged.settings.profile, "auto");
+  assert.equal(merged.settings.weekStart, 1);
+  assert.equal(merged.settings.showHolidays, true);
+  assert.equal(merged.settings.updatedAt, 0);
+
+  const migrated = migrateState({ tasks: {} });
+  assert.equal(migrated.settings.density, "comfortable");
 });
 
 test("пустые состояния не ломают слияние", () => {

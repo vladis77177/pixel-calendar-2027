@@ -137,6 +137,11 @@
     installNote: document.getElementById("installNote"),
     settingsMeta: document.getElementById("settingsMeta"),
     saveNoteText: document.getElementById("saveNoteText"),
+    syncUrl: document.getElementById("syncUrl"),
+    syncToken: document.getElementById("syncToken"),
+    syncConnectBtn: document.getElementById("syncConnectBtn"),
+    syncNowBtn: document.getElementById("syncNowBtn"),
+    syncStatus: document.getElementById("syncStatus"),
     toast: document.getElementById("toast"),
     toastText: document.getElementById("toastText")
   };
@@ -145,6 +150,7 @@
   const stored = loadStore();
 
   let settingsFingerprint = "";
+  let applyingRemote = false;
 
   const state = {
     view: stored.view,
@@ -430,6 +436,9 @@
         settings: state.settings
       }));
       syncNativeWidget();
+      if (window.PixelSync && !applyingRemote) {
+        window.PixelSync.scheduleSync(2000);
+      }
       return true;
     } catch (error) {
       if (!storageWarned) {
@@ -1752,6 +1761,7 @@
   function openSettings() {
     syncSettingsControls();
     updateSettingsMeta();
+    refreshSyncFields();
     if (!/^https?:$/.test(window.location.protocol)) {
       els.installNote.textContent = "Установка PWA доступна при открытии сайта через http:// или https://. Сейчас страница открыта как файл.";
     } else if (els.installBtn.hidden) {
@@ -2121,6 +2131,115 @@
     });
   }
 
+  function syncTimeLabel(ms) {
+    if (!ms) return "";
+    try {
+      return new Date(ms).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function renderSyncStatus(status) {
+    if (!els.syncStatus || !window.PixelSync) return;
+    const info = status || {};
+    const config = info.config || window.PixelSync.getSyncConfig();
+    let text = "Не подключено";
+    if (info.state === "syncing") {
+      text = "Синхронизация…";
+    } else if (info.state === "ok") {
+      text = `Синхронизировано в ${syncTimeLabel(info.at || config.lastOkAt)}`;
+      if (info.skew && info.skew > window.PixelSync.SKEW_WARNING) {
+        text += " · время на устройствах расходится";
+      }
+    } else if (info.state === "error" || config.lastError) {
+      text = `Сервер недоступен: ${info.message || config.lastError}`;
+    } else if (config.url && config.token) {
+      text = "Готово к подключению";
+    }
+    els.syncStatus.textContent = text;
+    els.syncStatus.dataset.state = info.state || (config.lastError ? "error" : "idle");
+    const busy = info.state === "syncing";
+    els.syncConnectBtn.disabled = busy;
+    els.syncNowBtn.disabled = busy;
+  }
+
+  function refreshSyncFields() {
+    if (!window.PixelSync || !els.syncUrl) return;
+    const config = window.PixelSync.getSyncConfig();
+    if (config.url) els.syncUrl.value = config.url;
+    if (config.token) els.syncToken.value = config.token;
+    renderSyncStatus(window.PixelSync.getSyncStatus());
+  }
+
+  async function syncFromForm(mode) {
+    if (!window.PixelSync) return;
+    const url = window.PixelSync.normalizeServerUrl(els.syncUrl.value);
+    const token = els.syncToken.value.trim();
+    if (!url) {
+      showToast("Адрес вида http://192.168.1.5:8787");
+      els.syncUrl.focus();
+      return;
+    }
+    if (!token) {
+      showToast("Введите код подключения");
+      els.syncToken.focus();
+      return;
+    }
+    els.syncUrl.value = url;
+    window.PixelSync.saveSyncConfig({
+      ...window.PixelSync.getSyncConfig(),
+      url,
+      token,
+      lastError: null
+    });
+    const result = await window.PixelSync.syncNow();
+    if (result.ok) {
+      showToast(mode === "connect" ? "Подключено" : "Синхронизировано");
+    } else {
+      showToast(result.reason || "Сервер недоступен");
+    }
+  }
+
+  function setupSync() {
+    if (!window.PixelSync) return;
+    window.PixelSync.configure({
+      getState: () => ({
+        version: 3,
+        view: state.view,
+        tasks: state.tasks,
+        series: state.series,
+        settings: state.settings
+      }),
+      applyState: (merged) => {
+        applyingRemote = true;
+        try {
+          state.tasks = merged.tasks;
+          state.series = merged.series;
+          state.settings = merged.settings;
+          settingsFingerprint = fingerprintSettings(state.settings);
+          saveStore();
+          applyProfile();
+          applyDaytime();
+          applyHoliday();
+          renderAll(false);
+          updateSettingsMeta();
+        } finally {
+          applyingRemote = false;
+        }
+      }
+    });
+    window.PixelSync.setStatusListener(renderSyncStatus);
+    const config = window.PixelSync.getSyncConfig();
+    const native = document.documentElement.dataset.platform === "android";
+    const localOrigin = !native && /^https?:$/.test(window.location.protocol)
+      ? window.location.origin
+      : "";
+    els.syncUrl.value = config.url || localOrigin;
+    els.syncToken.value = config.token || "";
+    renderSyncStatus(window.PixelSync.getSyncStatus());
+  }
+
   function bindEvents() {
     els.viewTabs.forEach((tab) => {
       tab.addEventListener("click", () => changeView(tab.dataset.view));
@@ -2352,6 +2471,10 @@
 
     els.exportJsonBtn.addEventListener("click", exportJson);
     els.exportIcsBtn.addEventListener("click", exportICS);
+    if (els.syncConnectBtn) {
+      els.syncConnectBtn.addEventListener("click", () => syncFromForm("connect"));
+      els.syncNowBtn.addEventListener("click", () => syncFromForm("now"));
+    }
     els.importJsonBtn.addEventListener("click", () => els.importFile.click());
     els.importFile.addEventListener("change", handleImportFile);
     els.clearDataBtn.addEventListener("click", clearAllData);
@@ -2566,6 +2689,7 @@
     applyHoliday();
     updateTodayLabel();
     bindEvents();
+    setupSync();
     setupInstall();
     registerServiceWorker();
     renderAll(true);

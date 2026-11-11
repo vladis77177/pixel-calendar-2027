@@ -159,6 +159,20 @@ if (!manifest.includes("RECEIVE_BOOT_COMPLETED")) {
 
 fs.writeFileSync(manifestFile, manifest);
 
+// 5b. Debug-манифест: cleartext-HTTP только для LAN-синхронизации.
+// В release-сборке HTTP по-прежнему запрещён.
+const debugManifest = path.join(ANDROID, "app", "src", "debug", "AndroidManifest.xml");
+fs.mkdirSync(path.dirname(debugManifest), { recursive: true });
+const debugXml = `<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:usesCleartextTraffic="true" />
+</manifest>
+`;
+if (!fs.existsSync(debugManifest) || fs.readFileSync(debugManifest, "utf8") !== debugXml) {
+  fs.writeFileSync(debugManifest, debugXml);
+  console.log("Debug manifest: cleartext enabled");
+}
+
 // 6. Widget strings
 const stringsFile = path.join(APP, "res", "values", "strings.xml");
 if (fs.existsSync(stringsFile)) {

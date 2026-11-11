@@ -6,6 +6,30 @@
   const SCHEMA_VERSION = 3;
   const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
   const ISO_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+  // Дублируем значения из app.js: sync.js должен работать без DOM.
+  const DEFAULT_SETTINGS = {
+    showHolidays: true,
+    profile: "auto",
+    density: "comfortable",
+    motion: "auto",
+    dialogAnimation: "auto",
+    decor: true,
+    sky: "auto",
+    holiday: "auto",
+    weekStart: 1,
+    updatedAt: 0
+  };
+
+  // Настройки синхронизируются блоком: недостающие поля заполняем
+  // значениями по умолчанию, иначе пустой сервер обнулит интерфейс.
+  function normalizeSettings(raw) {
+    const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+    return {
+      ...DEFAULT_SETTINGS,
+      ...source,
+      updatedAt: timeMs(source.updatedAt)
+    };
+  }
 
   function timeMs(value) {
     const number = Number(value);
@@ -102,10 +126,7 @@
         .map((item) => normalizeSeries(item, now))
       : [];
 
-    const settings = source.settings && typeof source.settings === "object" && !Array.isArray(source.settings)
-      ? { ...source.settings }
-      : {};
-    settings.updatedAt = timeMs(settings.updatedAt);
+    const settings = normalizeSettings(source.settings);
 
     return { version: SCHEMA_VERSION, view: source.view, tasks, series, settings };
   }
@@ -203,16 +224,183 @@
       (a, b) => a.createdAt - b.createdAt || String(a.id).localeCompare(String(b.id))
     );
 
-    const localSettings = local.settings || {};
-    const remoteSettings = remote.settings || {};
-    const settings = timeMs(remoteSettings.updatedAt) > timeMs(localSettings.updatedAt)
-      ? { ...remoteSettings }
-      : { ...localSettings };
+    const settings = normalizeSettings(
+      timeMs(remote.settings && remote.settings.updatedAt) > timeMs(local.settings && local.settings.updatedAt)
+        ? remote.settings
+        : local.settings
+    );
 
     return { version: SCHEMA_VERSION, view: local.view, tasks, series, settings };
   }
 
-  const api = { SCHEMA_VERSION, migrateState, mergeStates, normalizeTime };
+  // ── Синхронизация по локальной сети ─────────────────────────────────────
+  const SYNC_KEY = "pixel-calendar-2027-sync";
+  const SYNC_DEFAULTS = { url: "", token: "", lastSyncAt: 0, lastOkAt: 0, lastError: null };
+  const SYNC_TIMEOUT = 8000;
+  const SKEW_WARNING = 2 * 60 * 1000;
+
+  let syncProvider = null;
+  let syncPromise = null;
+  let syncTimer = 0;
+  let autoStarted = false;
+  let statusListener = null;
+  let lastStatus = { state: "idle" };
+
+  function readSyncConfig() {
+    if (typeof localStorage === "undefined") return { ...SYNC_DEFAULTS };
+    try {
+      const saved = JSON.parse(localStorage.getItem(SYNC_KEY) || "{}");
+      return { ...SYNC_DEFAULTS, ...(saved && typeof saved === "object" ? saved : {}) };
+    } catch (error) {
+      return { ...SYNC_DEFAULTS };
+    }
+  }
+
+  function writeSyncConfig(config) {
+    if (typeof localStorage === "undefined") return;
+    try {
+      localStorage.setItem(SYNC_KEY, JSON.stringify({ ...SYNC_DEFAULTS, ...config }));
+    } catch (error) {
+      // Переполнение хранилища не должно ломать календарь.
+    }
+  }
+
+  function normalizeServerUrl(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const withScheme = /^[a-z]+:\/\//i.test(raw) ? raw : `http://${raw}`;
+    try {
+      const parsed = new URL(withScheme);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+      return parsed.origin + parsed.pathname.replace(/\/+$/, "");
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function emitStatus(status) {
+    lastStatus = status;
+    if (typeof statusListener === "function") {
+      try {
+        statusListener(status);
+      } catch (error) {
+        // Слушатель интерфейса не должен ломать синхронизацию.
+      }
+    }
+  }
+
+  function getSyncStatus() {
+    return { ...lastStatus, config: readSyncConfig() };
+  }
+
+  function configure(provider) {
+    syncProvider = provider || null;
+    startAutoSync();
+  }
+
+  function setStatusListener(listener) {
+    statusListener = typeof listener === "function" ? listener : null;
+  }
+
+  function scheduleSync(delay) {
+    if (!readSyncConfig().url) return;
+    if (typeof setTimeout === "undefined") return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => {
+      syncNow();
+    }, typeof delay === "number" ? delay : 2000);
+  }
+
+  // Один цикл: отправляем своё состояние, получаем слитое сервером.
+  // Полный обмен вместо инкрементов: для личного объёма это дешевле и надёжнее.
+  function syncNow() {
+    if (syncPromise) return syncPromise;
+    const config = readSyncConfig();
+    if (!config.url || !config.token) {
+      emitStatus({ state: "off" });
+      return Promise.resolve({ ok: false, reason: "Не указан адрес или код подключения" });
+    }
+    if (!syncProvider || typeof fetch === "undefined") {
+      emitStatus({ state: "error", message: "Синхронизация недоступна" });
+      return Promise.resolve({ ok: false, reason: "Синхронизация недоступна" });
+    }
+
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timeout = controller ? setTimeout(() => controller.abort(), SYNC_TIMEOUT) : 0;
+    emitStatus({ state: "syncing" });
+
+    syncPromise = Promise.resolve()
+      .then(() => fetch(`${config.url}/api/state`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Sync-Token": config.token },
+        body: JSON.stringify(syncProvider.getState()),
+        cache: "no-store",
+        signal: controller ? controller.signal : undefined
+      }))
+      .then((response) => {
+        if (response.status === 401) throw new Error("Неверный код подключения");
+        if (!response.ok) throw new Error(`Сервер ответил ${response.status}`);
+        return response.json();
+      })
+      .then((remote) => {
+        if (!remote || typeof remote.serverTime !== "number") {
+          throw new Error("Сервер вернул неожиданный ответ");
+        }
+        const merged = mergeStates(syncProvider.getState(), remote);
+        syncProvider.applyState(merged);
+        const skew = Math.abs(remote.serverTime - Date.now());
+        const next = {
+          ...readSyncConfig(),
+          lastSyncAt: remote.serverTime,
+          lastOkAt: Date.now(),
+          lastError: null
+        };
+        writeSyncConfig(next);
+        emitStatus({ state: "ok", at: next.lastOkAt, skew });
+        return { ok: true };
+      })
+      .catch((error) => {
+        const message = error && error.name === "AbortError"
+          ? "Сервер не ответил за 8 секунд"
+          : (error && error.message) || "Ошибка сети";
+        writeSyncConfig({ ...readSyncConfig(), lastError: message });
+        emitStatus({ state: "error", message });
+        return { ok: false, reason: message };
+      })
+      .finally(() => {
+        if (timeout) clearTimeout(timeout);
+        syncPromise = null;
+      });
+
+    return syncPromise;
+  }
+
+  function startAutoSync() {
+    if (autoStarted || typeof document === "undefined") return;
+    autoStarted = true;
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) scheduleSync(800);
+    });
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", () => scheduleSync(1200));
+    }
+  }
+
+  const api = {
+    SCHEMA_VERSION,
+    migrateState,
+    mergeStates,
+    normalizeTime,
+    configure,
+    syncNow,
+    scheduleSync,
+    getSyncStatus,
+    setStatusListener,
+    getSyncConfig: readSyncConfig,
+    saveSyncConfig: writeSyncConfig,
+    normalizeServerUrl,
+    SKEW_WARNING
+  };
 
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.PixelSync = api;

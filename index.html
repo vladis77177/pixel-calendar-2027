@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#8bd8ff">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' http://*:8787; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta name="description" content="Милый пиксельный календарь на 2027 год с задачами по дням, повторами, поиском и экспортом в Google Календарь.">
   <title>Пиксельный календарь 2027</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -552,6 +552,30 @@
             </button>
           </div>
           <p class="settings-note" id="installNote">Если браузер поддерживает установку, кнопка появится автоматически.</p>
+        </section>
+
+        <section class="settings-section">
+          <h4 class="settings-title">Синхронизация</h4>
+          <p class="settings-note">Обмен с компьютером по домашней сети. На ПК запустите <code>npm run sync</code> — сервер покажет адрес и код подключения.</p>
+          <div class="settings-field settings-field-stack">
+            <label for="syncUrl">Адрес сервера</label>
+            <input type="url" id="syncUrl" inputmode="url" autocomplete="off" spellcheck="false" placeholder="http://192.168.1.5:8787">
+          </div>
+          <div class="settings-field settings-field-stack">
+            <label for="syncToken">Код подключения</label>
+            <input type="text" id="syncToken" autocomplete="off" spellcheck="false" placeholder="например, 4f2a9c1e">
+          </div>
+          <div class="settings-actions">
+            <button class="pixel-btn settings-btn" id="syncConnectBtn" type="button">
+              <svg class="icon"><use href="#i-check"></use></svg>
+              <span>Подключить</span>
+            </button>
+            <button class="pixel-btn settings-btn" id="syncNowBtn" type="button">
+              <svg class="icon"><use href="#i-repeat"></use></svg>
+              <span>Синхронизировать сейчас</span>
+            </button>
+          </div>
+          <p class="settings-note sync-status" id="syncStatus" data-state="idle">Не подключено</p>
         </section>
 
         <section class="settings-section">

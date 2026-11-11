@@ -10,4 +10,5 @@ local.properties
 *.apk
 # Ключ подписи APK — только локально и в GitHub Secrets
 /.signing/
+/sync-server/data/
 preview/
