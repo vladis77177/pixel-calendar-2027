@@ -3176,7 +3176,8 @@ html[data-profile="full"] .day-dialog::backdrop {
   line-height: 1.2;
 }
 
-.task-edit-date {
+.task-edit-date,
+.task-edit-time {
   flex: 0 0 128px;
   min-height: 32px;
   padding: 3px 5px;
@@ -3185,6 +3186,10 @@ html[data-profile="full"] .day-dialog::backdrop {
   color: var(--ink);
   font-size: 12px;
   font-weight: 700;
+}
+
+.task-edit-time {
+  flex: 0 0 92px;
 }
 
 .task-actions {
@@ -3308,8 +3313,13 @@ html[data-profile="full"] .day-dialog::backdrop {
   text-transform: uppercase;
 }
 
+.repeat-field[hidden] {
+  display: none;
+}
+
 .task-select,
-.task-date {
+.task-date,
+.task-time {
   min-height: 36px;
   max-width: 100%;
   padding: 5px 7px;
@@ -3322,9 +3332,14 @@ html[data-profile="full"] .day-dialog::backdrop {
 }
 
 .task-select:focus,
-.task-date:focus {
+.task-date:focus,
+.task-time:focus {
   outline: 3px solid #2f7fff;
   outline-offset: 1px;
+}
+
+.task-time:disabled {
+  opacity: 0.45;
 }
 
 .repeat-end {
@@ -3940,8 +3955,9 @@ html[data-profile="full"] .tool-dialog::backdrop {
     align-self: auto;
   }
 
-  .task-edit-date {
-    flex: 1 1 120px;
+  .task-edit-date,
+  .task-edit-time {
+    flex: 1 1 110px;
   }
 
   .task-actions {

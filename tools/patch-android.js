@@ -150,12 +150,20 @@ if (!manifest.includes("CalendarWidgetProvider")) {
   manifest = manifest.replace("</application>", `${receiver}    </application>`);
 }
 
-if (!manifest.includes("RECEIVE_BOOT_COMPLETED")) {
+// Разрешения для напоминаний и виджета. Capacitor сам добавляет часть из них,
+// но проверка по имени не даёт дублировать записи при повторном патче.
+const PERMISSIONS = [
+  "android.permission.RECEIVE_BOOT_COMPLETED",
+  "android.permission.POST_NOTIFICATIONS",
+  "android.permission.SCHEDULE_EXACT_ALARM"
+];
+PERMISSIONS.forEach((name) => {
+  if (manifest.includes(name)) return;
   manifest = manifest.replace(
     "</manifest>",
-    '    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />\n</manifest>'
+    `    <uses-permission android:name="${name}" />\n</manifest>`
   );
-}
+});
 
 fs.writeFileSync(manifestFile, manifest);
 

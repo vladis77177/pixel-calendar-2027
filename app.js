@@ -101,6 +101,8 @@
     taskInput: document.getElementById("taskInput"),
     taskRepeat: document.getElementById("taskRepeat"),
     taskRepeatEnd: document.getElementById("taskRepeatEnd"),
+    taskTime: document.getElementById("taskTime"),
+    taskTimeWrap: document.getElementById("taskTimeWrap"),
     repeatEndWrap: document.getElementById("repeatEndWrap"),
     repeatHint: document.getElementById("repeatHint"),
     formError: document.getElementById("formError"),
@@ -201,6 +203,18 @@
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso))) return false;
     const date = fromISO(iso);
     return !Number.isNaN(date.getTime()) && toISO(date) === iso;
+  }
+
+  function normalizeTimeValue(value) {
+    return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || "")) ? String(value) : null;
+  }
+
+  // Абсолютная метка напоминания: дата задачи + время. Нужна для сортировки
+  // и как запасной вариант, если time поменяют отдельно.
+  function remindTimestamp(iso, time) {
+    if (!isValidISO(iso) || !time) return null;
+    const at = new Date(`${iso}T${time}:00`);
+    return Number.isNaN(at.getTime()) ? null : at.getTime();
   }
 
   function addDays(date, amount) {
@@ -439,6 +453,9 @@
       if (window.PixelSync && !applyingRemote) {
         window.PixelSync.scheduleSync(2000);
       }
+      if (window.PixelNotify) {
+        window.PixelNotify.schedule(state.tasks, 900);
+      }
       return true;
     } catch (error) {
       if (!storageWarned) {
@@ -526,6 +543,7 @@
       text: task.text,
       done: task.done,
       createdAt: task.createdAt || 0,
+      time: task.time || null,
       isSeries: false,
       series: null
     }));
@@ -541,6 +559,7 @@
           text: series.text,
           done: Boolean(exception.done),
           createdAt: series.createdAt || 0,
+          time: null,
           isSeries: true,
           series
         };
@@ -1176,6 +1195,7 @@
     els.taskInput.value = "";
     els.taskRepeat.value = "none";
     els.taskRepeatEnd.value = "";
+    els.taskTime.value = "";
     updateRepeatFields();
     showDialog(els.dialog);
   }
@@ -1261,7 +1281,11 @@
           dateInput.type = "date";
           dateInput.value = iso;
           dateInput.setAttribute("aria-label", "Дата задачи");
-          form.append(input, dateInput);
+          const timeInput = el("input", "task-edit-time");
+          timeInput.type = "time";
+          timeInput.value = entry.time || "";
+          timeInput.setAttribute("aria-label", "Время напоминания");
+          form.append(input, dateInput, timeInput);
         } else {
           const note = el("span", "series-edit-note", "Изменится вся серия");
           note.title = seriesSchedule(entry.series);
@@ -1287,7 +1311,7 @@
         textWrap.appendChild(el("span", "task-text", entry.text));
         textWrap.appendChild(el("span", "task-meta", entry.isSeries
           ? `↻ ${seriesSchedule(entry.series)}`
-          : "Обычное дело"));
+          : entry.time ? `${entry.time} · напоминание` : "Обычное дело"));
         item.appendChild(textWrap);
 
         const actions = el("div", "task-actions");
@@ -1358,12 +1382,15 @@
   function updateRepeatFields() {
     const active = els.taskRepeat.value !== "none";
     els.repeatEndWrap.hidden = !active;
+    els.taskTimeWrap.hidden = active;
+    els.taskTime.disabled = active;
     if (active) {
       els.taskRepeatEnd.min = state.dialogDate || "";
-      els.repeatHint.textContent = "Серия появится во всех подходящих днях. Отметки и удаления хранятся отдельно для каждого дня.";
+      els.taskTime.value = "";
+      els.repeatHint.textContent = "Серия появится во всех подходящих днях. Отметки и удаления хранятся отдельно для каждого дня. Напоминание — только для дел без повтора.";
     } else {
       els.taskRepeatEnd.value = "";
-      els.repeatHint.textContent = "Повторяющиеся дела видны во всех подходящих днях.";
+      els.repeatHint.textContent = "Время включает напоминание в приложении. Повторяющиеся дела видны во всех подходящих днях.";
     }
   }
 
@@ -1377,6 +1404,7 @@
     }
 
     const repeat = REPEATS.includes(els.taskRepeat.value) ? els.taskRepeat.value : "none";
+    const time = repeat === "none" ? normalizeTimeValue(els.taskTime.value) : null;
     if (repeat !== "none") {
       const end = els.taskRepeatEnd.value;
       if (end && (!isValidISO(end) || end < state.dialogDate)) {
@@ -1404,8 +1432,8 @@
         createdAt: Date.now(),
         updatedAt: Date.now(),
         deletedAt: null,
-        time: null,
-        remindAt: null
+        time,
+        remindAt: remindTimestamp(state.dialogDate, time)
       };
       if (!state.tasks[state.dialogDate]) state.tasks[state.dialogDate] = [];
       state.tasks[state.dialogDate].push(task);
@@ -1416,6 +1444,7 @@
     els.taskInput.value = "";
     els.taskRepeat.value = "none";
     els.taskRepeatEnd.value = "";
+    els.taskTime.value = "";
     updateRepeatFields();
     els.formError.textContent = "";
     renderTaskList();
@@ -1497,6 +1526,7 @@
     const task = (state.tasks[state.dialogDate] || []).find((item) => item.id === entry.taskId);
     if (!task) return;
     const dateInput = form.querySelector(".task-edit-date");
+    const timeInput = form.querySelector(".task-edit-time");
     const newISO = dateInput && dateInput.value ? dateInput.value : state.dialogDate;
     if (!isValidISO(newISO)) {
       showToast("Некорректная дата");
@@ -1504,6 +1534,8 @@
     }
 
     task.text = clean.slice(0, 140);
+    task.time = normalizeTimeValue(timeInput ? timeInput.value : task.time);
+    task.remindAt = remindTimestamp(newISO, task.time);
     task.updatedAt = Date.now();
     const moved = newISO !== state.dialogDate;
     if (moved) {
@@ -2240,6 +2272,14 @@
     renderSyncStatus(window.PixelSync.getSyncStatus());
   }
 
+  function setupNotifications() {
+    if (!window.PixelNotify) return;
+    window.PixelNotify.schedule(state.tasks, 1500);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) window.PixelNotify.schedule(state.tasks, 600);
+    });
+  }
+
   function bindEvents() {
     els.viewTabs.forEach((tab) => {
       tab.addEventListener("click", () => changeView(tab.dataset.view));
@@ -2690,6 +2730,7 @@
     updateTodayLabel();
     bindEvents();
     setupSync();
+    setupNotifications();
     setupInstall();
     registerServiceWorker();
     renderAll(true);

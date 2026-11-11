@@ -12,6 +12,7 @@ const FILES = [
   "app.mobile.css",
   "app.js",
   "sync.js",
+  "notifications.js",
   "widget.html",
   "widget.css",
   "widget.js",
