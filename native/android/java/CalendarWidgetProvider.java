@@ -16,8 +16,8 @@ import java.util.Calendar;
 import java.util.Locale;
 
 public class CalendarWidgetProvider extends AppWidgetProvider {
-    private static final String PREFS = "pixel_widget";
-    private static final String KEY_PAYLOAD = "payload";
+    static final String PREFS = "pixel_widget";
+    static final String KEY_PAYLOAD = "payload";
     private static final int MAX_TASKS = 5;
 
     @Override
@@ -39,7 +39,7 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
         }
     }
 
-    private void updateAll(Context context) {
+    static void updateAll(Context context) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
         int[] ids = manager.getAppWidgetIds(
                 new android.content.ComponentName(context, CalendarWidgetProvider.class));
@@ -57,7 +57,7 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
         return "night".equals(phase);
     }
 
-    private void updateWidget(Context context, AppWidgetManager manager, int widgetId) {
+    private static void updateWidget(Context context, AppWidgetManager manager, int widgetId) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String raw = prefs.getString(KEY_PAYLOAD, "");
         String weekday = "";
