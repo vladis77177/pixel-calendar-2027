@@ -118,4 +118,4 @@ jobs:
           name: pixel-calendar-2027-debug
           path: pixel-calendar-2027-debug.apk
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7

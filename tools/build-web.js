@@ -39,9 +39,11 @@ const buildInfo = JSON.stringify({
 const builtIndex = path.join(OUT, "index.html");
 const html = fs.readFileSync(builtIndex, "utf8").replace(
   "<!--BUILD_INFO-->",
-  `<script>window.__BUILD_INFO__ = ${buildInfo};</script>`
+  '<script src="build-info.js"></script>'
 );
 fs.writeFileSync(builtIndex, html);
+// Отдельный файл вместо inline-скрипта: CSP разрешает только свои скрипты.
+fs.writeFileSync(path.join(OUT, "build-info.js"), `window.__BUILD_INFO__ = ${buildInfo};\n`);
 
 fs.cpSync(path.join(ROOT, "assets"), path.join(OUT, "assets"), { recursive: true });
 

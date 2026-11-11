@@ -167,6 +167,7 @@
   let deferredInstallPrompt = null;
   let suppressClickUntil = 0;
   let widgetSyncTimer = 0;
+  let lastWidgetPayload = "";
   let probing = false;
 
   function pad2(value) {
@@ -443,11 +444,14 @@
     widgetSyncTimer = window.setTimeout(() => {
       try {
         const payload = JSON.stringify(buildWidgetPayload());
+        // Виджет перерисовывается только когда данные действительно изменились.
+        if (payload === lastWidgetPayload) return;
+        lastWidgetPayload = payload;
         Promise.resolve(plugin.sync({ payload })).catch(() => {});
       } catch (error) {
         // The native widget is optional and must never break the web app.
       }
-    }, 350);
+    }, 250);
   }
 
   function isSeriesActiveOn(series, iso) {
@@ -1176,22 +1180,8 @@
 
     if (!entries.length) {
       const empty = el("li", "empty-state");
-      empty.innerHTML = `
-        <svg class="empty-chest" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">
-          <rect x="2" y="4" width="12" height="9" fill="#7b4b25"/>
-          <rect x="2" y="4" width="12" height="3" fill="#9e6838"/>
-          <rect x="3" y="3" width="10" height="2" fill="#c28b4f"/>
-          <rect x="2" y="7" width="12" height="1" fill="#4b2d17"/>
-          <rect x="7" y="8" width="2" height="3" fill="#f2c94c"/>
-          <rect x="7" y="8" width="2" height="1" fill="#fff0a4"/>
-          <rect x="3" y="11" width="2" height="2" fill="#5d381b"/>
-          <rect x="11" y="11" width="2" height="2" fill="#5d381b"/>
-          <rect x="4" y="5" width="1" height="1" fill="#5d381b"/>
-          <rect x="12" y="6" width="1" height="1" fill="#5d381b"/>
-        </svg>
-        <p class="empty-title">Сундук пока пуст</p>
-        <p class="empty-note">Добавь первое дело — и день сразу станет чуточку интереснее.</p>
-      `;
+      const tpl = document.getElementById("emptyChestTemplate");
+      if (tpl) empty.appendChild(tpl.content.cloneNode(true));
       els.taskList.appendChild(empty);
       return;
     }
