@@ -85,7 +85,7 @@ jobs:
           java-version: "21"
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           # Пакет "tools" удалён из cmdline-tools 16.0 — ставим только platform-tools,
           # нужные platforms/build-tools ставим шагом ниже.
