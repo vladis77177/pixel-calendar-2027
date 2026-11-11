@@ -2308,6 +2308,29 @@
     els.searchBtn.addEventListener("click", openSearch);
     els.settingsBtn.addEventListener("click", openSettings);
 
+    let swipeStart = null;
+    els.calendarView.addEventListener("pointerdown", (event) => {
+      // Мышь не свайпает: на ПК есть стрелки, а перетаскивание задач не должно мешать.
+      if (event.pointerType === "mouse") return;
+      if (event.target.closest("[data-drag-task], input, select, textarea, a")) return;
+      swipeStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    });
+
+    els.calendarView.addEventListener("pointerup", (event) => {
+      if (!swipeStart || swipeStart.id !== event.pointerId) return;
+      const dx = event.clientX - swipeStart.x;
+      const dy = event.clientY - swipeStart.y;
+      swipeStart = null;
+      // Горизонтальный жест должен быть явно горизонтальным, иначе это прокрутка.
+      if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
+      suppressClickUntil = Date.now() + 350;
+      shiftPeriod(dx < 0 ? 1 : -1);
+    });
+
+    els.calendarView.addEventListener("pointercancel", () => {
+      swipeStart = null;
+    });
+
     els.calendarView.addEventListener("click", (event) => {
       if (Date.now() < suppressClickUntil) return;
       const trigger = event.target.closest("[data-date]");

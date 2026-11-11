@@ -1,4 +1,4 @@
-const CACHE_NAME = "pixel-calendar-2027-v16";
+const CACHE_NAME = "pixel-calendar-2027-v17";
 const ASSETS = [
   "./",
   "./index.html",

@@ -1256,6 +1256,8 @@ html[data-holiday="on"] .island-grass {
 .calendar-view {
   min-height: 260px;
   contain: layout style;
+  /* Вертикальная прокрутка остаётся браузеру, горизонтальный жест забираем себе. */
+  touch-action: pan-y;
 }
 
 /* Месяц целиком на экране: высоту строк задаёт fitMonthView() в app.js. */
