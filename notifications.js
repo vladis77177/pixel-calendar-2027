@@ -270,6 +270,8 @@
           title: "Пиксельный календарь",
           body: item.text,
           actionTypeId: ACTION_TYPE_ID,
+          smallIcon: "ic_stat_calendar",
+          iconColor: "#5FB947",
           schedule: { at: item.at, allowWhileIdle: true },
           extra: item.seriesId
             ? { seriesId: item.seriesId, date: item.date }

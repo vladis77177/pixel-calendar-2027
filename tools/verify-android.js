@@ -49,6 +49,9 @@ for (const density of ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"]) {
     check(fs.existsSync(file), `Missing mipmap-${density}/${icon}`);
     if (fs.existsSync(file)) check(fs.statSync(file).size > 100, `Empty mipmap-${density}/${icon}`);
   }
+  const statIcon = path.join(APP, "res", `drawable-${density}`, "ic_stat_calendar.png");
+  check(fs.existsSync(statIcon), `Missing drawable-${density}/ic_stat_calendar.png`);
+  if (fs.existsSync(statIcon)) check(fs.statSync(statIcon).size > 100, `Empty drawable-${density}/ic_stat_calendar.png`);
 }
 
 const buildGradle = fs.readFileSync(path.join(ROOT, "android", "app", "build.gradle"), "utf8");

@@ -54,8 +54,7 @@ fs.cpSync(
 );
 
 // 3. Launcher icons (legacy + adaptive foreground) generated from the same pixel art
-const DENSITIES = { mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 };
-for (const [folder, size] of Object.entries(DENSITIES)) {
+const DENSITIES = { mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 };for (const [folder, size] of Object.entries(DENSITIES)) {
   const dir = path.join(APP, "res", `mipmap-${folder}`);
   fs.mkdirSync(dir, { recursive: true });
   writePng(path.join(dir, "ic_launcher.png"), size, size, drawBlock(size, 0.82, 0, "#8bd8ff"));
@@ -74,6 +73,53 @@ fs.writeFileSync(
   backgroundFile,
   '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">#8BD8FF</color>\n</resources>\n'
 );
+
+// 3b. Monochrome status-bar icon for notifications. Android paints it as a mask,
+// поэтому важна только форма: белые пиксели на прозрачном фоне.
+const STAT_ICON = [
+  "................",
+  "..##........##..",
+  "..##........##..",
+  "..############..",
+  "..#..........#..",
+  "..#..........#..",
+  "..#.......#..#..",
+  "..#......#...#..",
+  "..#.#...#....#..",
+  "..#..#.#.....#..",
+  "..#...#......#..",
+  "..#..........#..",
+  "..#..........#..",
+  "..############..",
+  "................",
+  "................"
+];
+
+function drawStatusIcon(size) {
+  const pixels = Buffer.alloc(size * size * 4);
+  const cell = size / 16;
+  for (let y = 0; y < 16; y += 1) {
+    for (let x = 0; x < 16; x += 1) {
+      if (STAT_ICON[y][x] !== "#") continue;
+      const left = Math.floor(x * cell);
+      const top = Math.floor(y * cell);
+      const right = Math.floor((x + 1) * cell);
+      const bottom = Math.floor((y + 1) * cell);
+      for (let py = top; py < bottom; py += 1) {
+        for (let px = left; px < right; px += 1) {
+          pixels.set([255, 255, 255, 255], (py * size + px) * 4);
+        }
+      }
+    }
+  }
+  return pixels;
+}
+
+for (const [folder, size] of Object.entries({ mdpi: 24, hdpi: 36, xhdpi: 48, xxhdpi: 72, xxxhdpi: 96 })) {
+  const dir = path.join(APP, "res", `drawable-${folder}`);
+  fs.mkdirSync(dir, { recursive: true });
+  writePng(path.join(dir, "ic_stat_calendar.png"), size, size, drawStatusIcon(size));
+}
 
 // 4. Splash screens: sky gradient with the centred grass block
 function drawSplash(width, height) {

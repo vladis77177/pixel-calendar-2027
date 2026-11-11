@@ -117,6 +117,8 @@ test("планировщик отправляет серии в плагин и 
     assert.ok(scheduled.length > 0);
     assert.ok(scheduled.every((item) => item.extra.seriesId === "s1"));
     assert.ok(scheduled.every((item) => item.actionTypeId === "calendar-task"));
+    assert.ok(scheduled.every((item) => item.smallIcon === "ic_stat_calendar"));
+    assert.ok(scheduled.every((item) => item.iconColor === "#5FB947"));
     assert.ok(scheduled.every((item) => item.schedule.allowWhileIdle === true));
     assert.equal(scheduled[0].body, "Полить цветы");
     assert.equal(registered.length, 1);
