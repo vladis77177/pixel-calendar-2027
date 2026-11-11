@@ -118,6 +118,68 @@ test("планировщик отправляет серии в плагин и 
   }
 });
 
+test("годовая серия получает напоминание за пределами 60 дней", () => {
+  const now = new Date(2026, 10, 11, 12, 0, 0);
+  const map = notify.collectReminders({}, [{
+    id: "s1",
+    text: "Продлить страховку",
+    freq: "yearly",
+    start: "2026-06-01",
+    end: null,
+    time: "10:00",
+    deletedAt: null,
+    exceptions: {}
+  }], now);
+
+  assert.equal(map.size, 1);
+  const item = map.get(notify.notificationId("s1@2027-06-01"));
+  assert.ok(item, "годовое напоминание должно планироваться заранее");
+  assert.equal(item.at.getFullYear(), 2027);
+  assert.equal(item.at.getMonth(), 5);
+  assert.equal(item.at.getDate(), 1);
+});
+
+test("дневная серия планирует окно и одно вхождение после него", () => {
+  const now = new Date(2026, 10, 11, 8, 0, 0);
+  const map = notify.collectReminders({}, [{
+    id: "s1",
+    text: "Зарядка",
+    freq: "daily",
+    start: "2026-11-11",
+    end: null,
+    time: "09:30",
+    deletedAt: null,
+    exceptions: {}
+  }], now);
+
+  assert.equal(map.size, notify.SERIES_HORIZON_DAYS + 2);
+  assert.ok(map.has(notify.notificationId("s1@2026-11-11")));
+  assert.ok(map.has(notify.notificationId("s1@2027-01-10")));
+  assert.ok(map.has(notify.notificationId("s1@2027-01-11")), "ближайшее вхождение за окном");
+});
+
+test("при переполнении у каждой серии остаётся напоминание", () => {
+  const now = new Date(2026, 10, 11, 8, 0, 0);
+  const series = Array.from({ length: 6 }, (_, index) => ({
+    id: `s${index}`,
+    text: `Дело ${index}`,
+    freq: "daily",
+    start: "2026-11-11",
+    end: null,
+    time: "09:30",
+    deletedAt: null,
+    exceptions: {}
+  }));
+  const map = notify.collectReminders({}, series, now);
+  assert.equal(map.size, notify.MAX_NOTIFICATIONS);
+  for (let index = 0; index < series.length; index += 1) {
+    assert.ok(
+      [...map.values()].some((item) => item.seriesId === `s${index}`),
+      `серия s${index} не должна исчезнуть`
+    );
+  }
+});
+
 test("правила повторения в напоминаниях совпадают с календарём", () => {
   const base = { start: "2026-11-10", deletedAt: null, exceptions: {}, time: "09:00" };
   assert.equal(notify.seriesActiveOn({ ...base, freq: "weekdays" }, "2026-11-14"), false);

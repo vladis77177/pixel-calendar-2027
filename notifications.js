@@ -10,6 +10,9 @@
   // Насколько вперёд планируем повторы: чаще приложение открывают, но и без
   // этого месяца напоминаний хватит. Android не любит сотни отложенных.
   const SERIES_HORIZON_DAYS = 60;
+  // Дальше окна ищем только ближайшее вхождение серии: годовой повтор
+  // может быть и через несколько лет (29 февраля), но терять его нельзя.
+  const MAX_LOOKAHEAD_DAYS = 1500;
   const MAX_NOTIFICATIONS = 250;
 
   function plugin() {
@@ -72,6 +75,67 @@
     return false;
   }
 
+  // Разворачивает серию: все вхождения на 60 дней вперёд плюс ближайшее
+  // вхождение за пределами окна. Пустые и выполненные дни пропускаются.
+  function seriesCandidates(item, current, floor) {
+    const result = [];
+    if (!item || item.deletedAt || !item.time) return result;
+    const today = isoOf(current);
+    if (item.end && item.end < today) return result;
+
+    const add = (iso) => {
+      if (!seriesActiveOn(item, iso)) return false;
+      const exception = item.exceptions && item.exceptions[iso];
+      if (exception && (exception.deleted || exception.done)) return false;
+      const at = whenFor(iso, item.time);
+      if (!at || at.getTime() <= floor) return false;
+      result.push({ iso, at });
+      return true;
+    };
+
+    for (let step = 0; step <= SERIES_HORIZON_DAYS; step += 1) {
+      const iso = addDays(today, step);
+      if (item.end && iso > item.end) return result;
+      add(iso);
+    }
+
+    for (let step = SERIES_HORIZON_DAYS + 1; step <= SERIES_HORIZON_DAYS + MAX_LOOKAHEAD_DAYS; step += 1) {
+      const iso = addDays(today, step);
+      if (item.end && iso > item.end) break;
+      // Если ближайшее вхождение исключено, ищем следующее.
+      if (add(iso)) break;
+    }
+    return result;
+  }
+
+  // Держит общий лимит Android, но не даёт потерять серию целиком:
+  // у каждой серии остаётся хотя бы одно ближайшее напоминание.
+  function limitReminders(wanted) {
+    if (wanted.size <= MAX_NOTIFICATIONS) return wanted;
+    const entries = [...wanted.entries()].sort(
+      (a, b) => a[1].at - b[1].at || String(a[0]).localeCompare(String(b[0]))
+    );
+    const protectedIds = new Set();
+    const seen = new Set();
+    entries.forEach(([id, item]) => {
+      if (!item.seriesId || seen.has(item.seriesId)) return;
+      seen.add(item.seriesId);
+      protectedIds.add(id);
+    });
+    if (protectedIds.size >= MAX_NOTIFICATIONS) {
+      return new Map(entries.slice(0, MAX_NOTIFICATIONS));
+    }
+    const result = new Map();
+    entries.forEach(([id, item]) => {
+      if (protectedIds.has(id)) result.set(id, item);
+    });
+    for (const [id, item] of entries) {
+      if (result.size >= MAX_NOTIFICATIONS) break;
+      if (!result.has(id)) result.set(id, item);
+    }
+    return result;
+  }
+
   // Собирает все будущие напоминания из обычных задач и серий.
   // Возвращает Map<id, { at, text, taskId, seriesId, date }>.
   function collectReminders(tasks, series, now) {
@@ -94,18 +158,8 @@
       });
     });
 
-    const today = isoOf(current);
     (Array.isArray(series) ? series : []).forEach((item) => {
-      if (!item || item.deletedAt || !item.time) return;
-      if (item.end && item.end < today) return;
-      for (let step = 0; step <= SERIES_HORIZON_DAYS; step += 1) {
-        const iso = addDays(today, step);
-        if (item.end && iso > item.end) break;
-        if (!seriesActiveOn(item, iso)) continue;
-        const exception = item.exceptions && item.exceptions[iso];
-        if (exception && (exception.deleted || exception.done)) continue;
-        const at = whenFor(iso, item.time);
-        if (!at || at.getTime() <= floor) continue;
+      seriesCandidates(item, current, floor).forEach(({ iso, at }) => {
         wanted.set(notificationId(`${item.id}@${iso}`), {
           at,
           text: item.text,
@@ -113,17 +167,10 @@
           seriesId: item.id,
           date: iso
         });
-      }
+      });
     });
 
-    // Страховка от сотен дел: оставляем самые близкие по времени.
-    if (wanted.size > MAX_NOTIFICATIONS) {
-      const closest = [...wanted.entries()]
-        .sort((a, b) => a[1].at - b[1].at)
-        .slice(0, MAX_NOTIFICATIONS);
-      return new Map(closest);
-    }
-    return wanted;
+    return limitReminders(wanted);
   }
 
   async function ensurePermission() {
@@ -208,10 +255,12 @@
 
   const api = {
     SERIES_HORIZON_DAYS,
+    MAX_NOTIFICATIONS,
     isNative,
     notificationId,
     whenFor,
     seriesActiveOn,
+    seriesCandidates,
     collectReminders,
     ensurePermission,
     cancel,
