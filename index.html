@@ -576,6 +576,16 @@
             </button>
           </div>
           <p class="settings-note sync-status" id="syncStatus" data-state="idle">Не подключено</p>
+          <details class="sync-help">
+            <summary>Как подключить</summary>
+            <ol>
+              <li>На компьютере в папке проекта: <code>npm run sync</code>.</li>
+              <li>Разрешите Node.js доступ к частной сети, если спросит брандмауэр Windows.</li>
+              <li>В консоли возьмите адрес из строки «В сети» и код подключения.</li>
+              <li>Вставьте их в поля выше и нажмите «Подключить».</li>
+            </ol>
+            <p class="settings-note">Телефон и компьютер должны быть в одной Wi-Fi-сети. HTTP работает в debug-APK и в PWA; release-APK потребует HTTPS.</p>
+          </details>
         </section>
 
         <section class="settings-section">
