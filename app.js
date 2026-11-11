@@ -144,6 +144,8 @@
   const initialToday = startOfDay(new Date());
   const stored = loadStore();
 
+  let settingsFingerprint = "";
+
   const state = {
     view: stored.view,
     cursor: new Date(initialToday),
@@ -158,6 +160,8 @@
     searchStatus: "all",
     searchType: "all"
   };
+
+  settingsFingerprint = fingerprintSettings(state.settings);
 
   let knownToday = toISO(initialToday);
   let lastDayISO = null;
@@ -299,48 +303,67 @@
     return `${base}.${holidayPart} ${count} ${tasksWord(count)}. Открыть список дел.`;
   }
 
+  function fingerprintSettings(settings) {
+    return JSON.stringify({ ...settings, updatedAt: 0 });
+  }
+
   function normalizeStore(parsed) {
-    const fallback = { view: "month", tasks: {}, series: [], settings: { ...DEFAULT_SETTINGS } };
+    const fallback = { view: "month", tasks: {}, series: [], settings: { ...DEFAULT_SETTINGS, updatedAt: 0 } };
     if (!parsed || typeof parsed !== "object") return fallback;
 
-    const view = VIEWS.includes(parsed.view) ? parsed.view : "month";
+    // Структурная миграция v2→v3: метки времени, могилы, time/remindAt.
+    const migrated = window.PixelSync && typeof window.PixelSync.migrateState === "function"
+      ? window.PixelSync.migrateState(parsed)
+      : parsed;
+
+    const view = VIEWS.includes(migrated.view) ? migrated.view : "month";
     const tasks = {};
-    if (parsed.tasks && typeof parsed.tasks === "object" && !Array.isArray(parsed.tasks)) {
-      Object.keys(parsed.tasks).forEach((iso) => {
+    if (migrated.tasks && typeof migrated.tasks === "object" && !Array.isArray(migrated.tasks)) {
+      Object.keys(migrated.tasks).forEach((iso) => {
         if (!isValidISO(iso)) return;
-        const source = parsed.tasks[iso];
+        const source = migrated.tasks[iso];
         if (!Array.isArray(source)) return;
         const clean = source
           .filter((task) => task && typeof task.text === "string" && task.text.trim())
-          .map((task) => ({
-            id: typeof task.id === "string" && task.id ? task.id : makeId(),
-            text: task.text.trim().slice(0, 140),
-            done: Boolean(task.done),
-            createdAt: Number(task.createdAt) || Date.now()
-          }));
+          .map((task) => {
+            const createdAt = Number(task.createdAt) || Date.now();
+            return {
+              id: typeof task.id === "string" && task.id ? task.id : makeId(),
+              text: task.text.trim().slice(0, 140),
+              done: Boolean(task.done),
+              createdAt,
+              updatedAt: Number(task.updatedAt) || createdAt,
+              deletedAt: Number(task.deletedAt) || null,
+              time: typeof task.time === "string" ? task.time : null,
+              remindAt: Number(task.remindAt) || null
+            };
+          });
         if (clean.length) tasks[iso] = clean;
       });
     }
 
     const series = [];
-    if (Array.isArray(parsed.series)) {
-      parsed.series.forEach((raw) => {
+    if (Array.isArray(migrated.series)) {
+      migrated.series.forEach((raw) => {
         if (!raw || typeof raw.text !== "string" || !raw.text.trim()) return;
         const freq = REPEATS.includes(raw.freq) && raw.freq !== "none" ? raw.freq : null;
         if (!freq || !isValidISO(raw.start)) return;
         const start = raw.start;
         let end = isValidISO(raw.end) ? raw.end : null;
         if (end && end < start) end = null;
+        const createdAt = Number(raw.createdAt) || Date.now();
+        const updatedAt = Number(raw.updatedAt) || createdAt;
         const exceptions = {};
         if (raw.exceptions && typeof raw.exceptions === "object" && !Array.isArray(raw.exceptions)) {
           Object.keys(raw.exceptions).forEach((iso) => {
             if (!isValidISO(iso)) return;
             const ex = raw.exceptions[iso];
             if (!ex || typeof ex !== "object") return;
-            const clean = {};
+            const clean = { updatedAt: Number(ex.updatedAt) || updatedAt };
             if (ex.done) clean.done = true;
             if (ex.deleted) clean.deleted = true;
-            if (clean.done || clean.deleted) exceptions[iso] = clean;
+            // Пустая отметка хранит время снятия галочки — нужна для слияния.
+            exceptions[iso] = clean;
           });
         }
         series.push({
@@ -349,13 +372,15 @@
           freq,
           start,
           end,
-          createdAt: Number(raw.createdAt) || Date.now(),
+          createdAt,
+          updatedAt,
+          deletedAt: Number(raw.deletedAt) || null,
           exceptions
         });
       });
     }
 
-    const rawSettings = parsed.settings && typeof parsed.settings === "object" ? parsed.settings : {};
+    const rawSettings = migrated.settings && typeof migrated.settings === "object" ? migrated.settings : {};
 
     return {
       view,
@@ -372,7 +397,8 @@
         decor: rawSettings.decor !== false,
         sky: SKY_MODES.includes(rawSettings.sky) ? rawSettings.sky : DEFAULT_SETTINGS.sky,
         holiday: HOLIDAY_MODES.includes(rawSettings.holiday) ? rawSettings.holiday : DEFAULT_SETTINGS.holiday,
-        weekStart: rawSettings.weekStart === 0 ? 0 : 1
+        weekStart: rawSettings.weekStart === 0 ? 0 : 1,
+        updatedAt: Number(rawSettings.updatedAt) || 0
       }
     };
   }
@@ -389,8 +415,15 @@
 
   function saveStore() {
     try {
+      // Настройки синхронизируются блоком, поэтому метка времени обновляется
+      // только когда их содержимое действительно изменилось.
+      const fingerprint = fingerprintSettings(state.settings);
+      if (fingerprint !== settingsFingerprint) {
+        state.settings.updatedAt = Date.now();
+        settingsFingerprint = fingerprint;
+      }
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        version: 2,
+        version: 3,
         view: state.view,
         tasks: state.tasks,
         series: state.series,
@@ -455,7 +488,7 @@
   }
 
   function isSeriesActiveOn(series, iso) {
-    if (!series || !isValidISO(iso)) return false;
+    if (!series || series.deletedAt || !isValidISO(iso)) return false;
     if (iso < series.start) return false;
     if (series.end && iso > series.end) return false;
     const exception = series.exceptions && series.exceptions[iso];
@@ -475,7 +508,9 @@
   }
 
   function getEntries(iso) {
-    const tasks = (state.tasks[iso] || []).map((task) => ({
+    const tasks = (state.tasks[iso] || [])
+      .filter((task) => !task.deletedAt)
+      .map((task) => ({
       key: task.id,
       taskId: task.id,
       seriesId: null,
@@ -1347,6 +1382,8 @@
         start: state.dialogDate,
         end: end || null,
         createdAt: Date.now(),
+        updatedAt: Date.now(),
+        deletedAt: null,
         exceptions: {}
       });
       showToast("Повторяющаяся серия создана");
@@ -1355,7 +1392,11 @@
         id: makeId(),
         text: clean.slice(0, 140),
         done: false,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        deletedAt: null,
+        time: null,
+        remindAt: null
       };
       if (!state.tasks[state.dialogDate]) state.tasks[state.dialogDate] = [];
       state.tasks[state.dialogDate].push(task);
@@ -1385,12 +1426,16 @@
       const exception = series.exceptions[state.dialogDate] || {};
       if (checked) exception.done = true;
       else delete exception.done;
-      if (exception.done || exception.deleted) series.exceptions[state.dialogDate] = exception;
-      else delete series.exceptions[state.dialogDate];
+      exception.updatedAt = Date.now();
+      // Отметка остаётся даже без done/deleted: время снятия галочки
+      // должно побеждать старую отметку с другого устройства.
+      series.exceptions[state.dialogDate] = exception;
+      series.updatedAt = exception.updatedAt;
     } else {
       const task = (state.tasks[state.dialogDate] || []).find((item) => item.id === entry.taskId);
       if (!task) return;
       task.done = checked;
+      task.updatedAt = Date.now();
     }
 
     saveStore();
@@ -1430,6 +1475,7 @@
       const series = getSeriesById(entry.seriesId);
       if (!series) return;
       series.text = clean.slice(0, 140);
+      series.updatedAt = Date.now();
       state.editingKey = null;
       saveStore();
       renderTaskList();
@@ -1449,6 +1495,7 @@
     }
 
     task.text = clean.slice(0, 140);
+    task.updatedAt = Date.now();
     const moved = newISO !== state.dialogDate;
     if (moved) {
       const source = state.tasks[state.dialogDate] || [];
@@ -1491,8 +1538,9 @@
     const index = tasks.findIndex((task) => task.id === entry.taskId);
     if (index < 0) return;
     const removed = tasks[index];
-    tasks.splice(index, 1);
-    if (!tasks.length) delete state.tasks[state.dialogDate];
+    // Не вырезаем запись: могила не даёт удалению «воскреснуть» при синхронизации.
+    removed.deletedAt = Date.now();
+    removed.updatedAt = removed.deletedAt;
     if (state.editingKey === key) state.editingKey = null;
     if (state.deleteConfirmKey === key) state.deleteConfirmKey = null;
     saveStore();
@@ -1510,7 +1558,9 @@
     if (!series) return;
     const exception = series.exceptions[state.dialogDate] || {};
     exception.deleted = true;
+    exception.updatedAt = Date.now();
     series.exceptions[state.dialogDate] = exception;
+    series.updatedAt = exception.updatedAt;
     state.deleteConfirmKey = null;
     saveStore();
     populateDialog();
@@ -1521,7 +1571,10 @@
   function deleteSeries(key) {
     const entry = state.dialogDate ? getEntryByKey(state.dialogDate, key) : null;
     if (!entry || !entry.isSeries) return;
-    state.series = state.series.filter((series) => series.id !== entry.seriesId);
+    const series = getSeriesById(entry.seriesId);
+    if (!series) return;
+    series.deletedAt = Date.now();
+    series.updatedAt = series.deletedAt;
     state.deleteConfirmKey = null;
     saveStore();
     populateDialog();
@@ -1542,7 +1595,11 @@
       id: makeId(),
       text: clean.slice(0, 140),
       done: false,
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      deletedAt: null,
+      time: null,
+      remindAt: null
     });
     saveStore();
     els.quickAddInput.value = "";
@@ -1563,6 +1620,7 @@
     if (!source.length) delete state.tasks[fromIso];
     if (!state.tasks[toIso]) state.tasks[toIso] = [];
     state.tasks[toIso].push(task);
+    task.updatedAt = Date.now();
     saveStore();
     if (state.dialogDate && els.dialog.open) populateDialog();
     renderAll(false);
@@ -1582,6 +1640,7 @@
     if (state.searchType !== "series") {
       Object.keys(state.tasks).forEach((iso) => {
         state.tasks[iso].forEach((task) => {
+          if (task.deletedAt) return;
           if (query && !task.text.toLowerCase().includes(query)) return;
           if (state.searchStatus === "active" && task.done) return;
           if (state.searchStatus === "done" && !task.done) return;
@@ -1599,6 +1658,7 @@
     if (state.searchType !== "task") {
       const todayISO = toISO(startOfDay(new Date()));
       state.series.forEach((series) => {
+        if (series.deletedAt) return;
         if (query && !series.text.toLowerCase().includes(query)) return;
         const date = nextSeriesOccurrence(series, todayISO) || series.start;
         const exception = series.exceptions[date] || {};
@@ -1701,8 +1761,12 @@
   }
 
   function updateSettingsMeta() {
-    const totalTasks = Object.values(state.tasks).reduce((sum, list) => sum + list.length, 0);
-    els.settingsMeta.textContent = `${totalTasks} ${tasksWord(totalTasks)} · ${state.series.length} ${seriesWord(state.series.length)}`;
+    const totalTasks = Object.values(state.tasks).reduce(
+      (sum, list) => sum + list.filter((task) => !task.deletedAt).length,
+      0
+    );
+    const totalSeries = state.series.filter((series) => !series.deletedAt).length;
+    els.settingsMeta.textContent = `${totalTasks} ${tasksWord(totalTasks)} · ${totalSeries} ${seriesWord(totalSeries)}`;
     if (els.settingsBuild) els.settingsBuild.textContent = `Сборка: ${buildLabel()}`;
   }
 
@@ -1832,7 +1896,7 @@
   function exportJson() {
     const payload = {
       app: "pixel-calendar-2027",
-      version: 2,
+      version: 3,
       exportedAt: new Date().toISOString(),
       view: state.view,
       tasks: state.tasks,
@@ -1909,6 +1973,7 @@
 
     Object.keys(state.tasks).sort().forEach((iso) => {
       state.tasks[iso].forEach((task) => {
+        if (task.deletedAt) return;
         const end = toISO(addDays(fromISO(iso), 1));
         lines.push(
           "BEGIN:VEVENT",
@@ -1925,6 +1990,7 @@
     });
 
     state.series.forEach((series) => {
+      if (series.deletedAt) return;
       const end = toISO(addDays(fromISO(series.start), 1));
       lines.push(
         "BEGIN:VEVENT",
@@ -2003,8 +2069,21 @@
 
   function clearAllData() {
     if (!window.confirm("Удалить все задачи и повторяющиеся серии? Это действие нельзя отменить.")) return;
-    state.tasks = {};
-    state.series = [];
+    // Могилы вместо обнуления: иначе очистка на одном устройстве
+    // вернёт данные с другого при следующей синхронизации.
+    const now = Date.now();
+    Object.keys(state.tasks).forEach((iso) => {
+      state.tasks[iso].forEach((task) => {
+        if (task.deletedAt) return;
+        task.deletedAt = now;
+        task.updatedAt = now;
+      });
+    });
+    state.series.forEach((series) => {
+      if (series.deletedAt) return;
+      series.deletedAt = now;
+      series.updatedAt = now;
+    });
     state.editingKey = null;
     state.deleteConfirmKey = null;
     saveStore();

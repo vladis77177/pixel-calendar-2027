@@ -1,0 +1,175 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const { migrateState, mergeStates } = require("../sync.js");
+
+function task(overrides) {
+  return {
+    id: "t1",
+    text: "Задача",
+    done: false,
+    createdAt: 100,
+    updatedAt: 100,
+    deletedAt: null,
+    time: null,
+    remindAt: null,
+    ...overrides
+  };
+}
+
+function state(tasks, series, settings) {
+  return {
+    version: 3,
+    view: "month",
+    tasks: tasks || {},
+    series: series || [],
+    settings: { showHolidays: true, weekStart: 1, updatedAt: 0, ...(settings || {}) }
+  };
+}
+
+test("миграция v2: метки времени, могилы и новые поля", () => {
+  const migrated = migrateState({
+    version: 2,
+    view: "week",
+    tasks: {
+      "2026-11-10": [{ id: "a", text: "Полить цветы", done: true, createdAt: 111 }],
+      "not-a-date": [{ id: "bad", text: "Мусор", createdAt: 1 }]
+    },
+    series: [{
+      id: "s",
+      text: "Уборка",
+      freq: "weekly",
+      start: "2026-11-10",
+      createdAt: 222,
+      exceptions: {
+        "2026-11-17": { done: true },
+        "2026-11-24": { deleted: true }
+      }
+    }],
+    settings: { showHolidays: false }
+  });
+
+  assert.equal(migrated.version, 3);
+  assert.equal(migrated.view, "week");
+  assert.deepEqual(Object.keys(migrated.tasks), ["2026-11-10"]);
+
+  const item = migrated.tasks["2026-11-10"][0];
+  assert.equal(item.updatedAt, 111);
+  assert.equal(item.deletedAt, null);
+  assert.equal(item.time, null);
+  assert.equal(item.remindAt, null);
+
+  const series = migrated.series[0];
+  assert.equal(series.updatedAt, 222);
+  assert.equal(series.deletedAt, null);
+  assert.equal(series.exceptions["2026-11-17"].updatedAt, 222);
+  assert.equal(series.exceptions["2026-11-17"].done, true);
+  assert.equal(series.exceptions["2026-11-24"].deleted, true);
+  assert.equal(migrated.settings.updatedAt, 0);
+});
+
+test("миграция сохраняет time/remindAt и отбрасывает некорректное время", () => {
+  const migrated = migrateState({
+    tasks: {
+      "2026-11-10": [
+        task({ id: "a", time: "09:30", remindAt: 5000 }),
+        task({ id: "b", time: "25:00", remindAt: -3 })
+      ]
+    }
+  });
+  assert.equal(migrated.tasks["2026-11-10"][0].time, "09:30");
+  assert.equal(migrated.tasks["2026-11-10"][0].remindAt, 5000);
+  assert.equal(migrated.tasks["2026-11-10"][1].time, null);
+  assert.equal(migrated.tasks["2026-11-10"][1].remindAt, null);
+});
+
+test("LWW: побеждает более поздняя правка задачи", () => {
+  const local = state({ "2026-11-10": [task({ text: "Старое", updatedAt: 100 })] });
+  const remote = state({ "2026-11-10": [task({ text: "Новое", updatedAt: 200 })] });
+  const merged = mergeStates(local, remote);
+  assert.equal(merged.tasks["2026-11-10"][0].text, "Новое");
+
+  const reverse = mergeStates(remote, local);
+  assert.equal(reverse.tasks["2026-11-10"][0].text, "Новое");
+});
+
+test("удаление против правки: могила новее — запись удалена", () => {
+  const local = state({ "2026-11-10": [task({ deletedAt: 300, updatedAt: 300 })] });
+  const remote = state({ "2026-11-10": [task({ text: "Правка", updatedAt: 200 })] });
+  const merged = mergeStates(local, remote);
+  assert.equal(merged.tasks["2026-11-10"][0].deletedAt, 300);
+});
+
+test("удаление против правки: правка новее — запись возвращается", () => {
+  const local = state({ "2026-11-10": [task({ deletedAt: 300, updatedAt: 300 })] });
+  const remote = state({ "2026-11-10": [task({ text: "Вернул", deletedAt: 200, updatedAt: 400 })] });
+  const merged = mergeStates(local, remote);
+  assert.equal(merged.tasks["2026-11-10"][0].deletedAt, null);
+  assert.equal(merged.tasks["2026-11-10"][0].text, "Вернул");
+});
+
+test("перенос задачи: одна запись, дата выбирается по updatedAt", () => {
+  const local = state({ "2026-11-10": [task({ updatedAt: 100 })] });
+  const remote = state({ "2026-11-11": [task({ updatedAt: 200 })] });
+  const merged = mergeStates(local, remote);
+  assert.equal(Object.keys(merged.tasks).length, 1);
+  assert.ok(merged.tasks["2026-11-11"]);
+  assert.equal(merged.tasks["2026-11-11"][0].id, "t1");
+});
+
+test("исключения серии сливаются по каждому дню", () => {
+  const local = state({}, [{
+    id: "s", text: "Зарядка", freq: "daily", start: "2026-11-10",
+    createdAt: 10, updatedAt: 10, deletedAt: null,
+    exceptions: {
+      "2026-11-11": { done: true, updatedAt: 100 },
+      "2026-11-12": { done: true, updatedAt: 100 }
+    }
+  }]);
+  const remote = state({}, [{
+    id: "s", text: "Зарядка", freq: "daily", start: "2026-11-10",
+    createdAt: 10, updatedAt: 20, deletedAt: null,
+    exceptions: {
+      "2026-11-11": { deleted: true, updatedAt: 200 },
+      "2026-11-12": { updatedAt: 300 }
+    }
+  }]);
+  const merged = mergeStates(local, remote);
+  const series = merged.series[0];
+  assert.equal(series.exceptions["2026-11-11"].deleted, true);
+  assert.equal(series.exceptions["2026-11-12"].done, undefined);
+  assert.equal(series.exceptions["2026-11-12"].updatedAt, 300);
+});
+
+test("настройки сливаются блоком по settings.updatedAt", () => {
+  const local = state({}, [], { showHolidays: true, updatedAt: 100 });
+  const remote = state({}, [], { showHolidays: false, updatedAt: 200 });
+  assert.equal(mergeStates(local, remote).settings.showHolidays, false);
+  assert.equal(mergeStates(remote, local).settings.showHolidays, false);
+
+  const newerLocal = state({}, [], { showHolidays: true, updatedAt: 300 });
+  assert.equal(mergeStates(newerLocal, remote).settings.showHolidays, true);
+});
+
+test("слияние идемпотентно и не зависит от порядка одинаковых данных", () => {
+  const a = state({
+    "2026-11-10": [task({ text: "A", updatedAt: 100 })]
+  }, [{
+    id: "s", text: "Серия", freq: "weekly", start: "2026-11-10",
+    createdAt: 10, updatedAt: 10, deletedAt: null, exceptions: {}
+  }], { updatedAt: 50 });
+  const b = state({
+    "2026-11-10": [task({ text: "B", updatedAt: 200 })]
+  }, [], { updatedAt: 40 });
+
+  const once = mergeStates(a, b);
+  assert.deepEqual(mergeStates(once, b), once);
+  assert.deepEqual(mergeStates(once, once), once);
+  assert.deepEqual(mergeStates(a, a), { ...a });
+});
+
+test("пустые состояния не ломают слияние", () => {
+  const empty = mergeStates(null, null);
+  assert.deepEqual(empty.tasks, {});
+  assert.deepEqual(empty.series, []);
+  assert.equal(empty.version, 3);
+});

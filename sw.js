@@ -1,10 +1,11 @@
-const CACHE_NAME = "pixel-calendar-2027-v9";
+const CACHE_NAME = "pixel-calendar-2027-v10";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.mobile.css",
   "./app.js",
+  "./sync.js",
   "./widget.html",
   "./widget.css",
   "./widget.js",
@@ -14,6 +15,7 @@ const ASSETS = [
   "./assets/fonts/pixelify-latin.woff2",
   "./assets/fonts/nunito-cyrillic.woff2",
   "./assets/fonts/nunito-latin.woff2",
+  "./assets/fonts/tiny5.woff2",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png",
   "./assets/icons/icon-maskable-512.png",

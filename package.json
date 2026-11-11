@@ -1,10 +1,11 @@
 {
   "name": "pixel-calendar-2027",
-  "version": "0.3.4",
+  "version": "0.4.0",
   "private": true,
   "description": "Пиксельный календарь 2027: веб-версия и Android-приложение на Capacitor.",
   "scripts": {
     "build:web": "node tools/build-web.js",
+    "test": "node --test tests/",
     "android:add": "npm run build:web && cap add android",
     "android:sync": "npm run build:web && cap sync android",
     "android:patch": "node tools/patch-android.js"
