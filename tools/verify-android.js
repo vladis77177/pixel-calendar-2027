@@ -22,6 +22,8 @@ function read(file) {
 const manifest = read("AndroidManifest.xml");
 check(manifest.includes("CalendarWidgetProvider"), "Widget receiver is not registered in AndroidManifest.xml");
 check(manifest.includes("RECEIVE_BOOT_COMPLETED"), "Boot permission is missing");
+check(manifest.includes("POST_NOTIFICATIONS"), "Notification permission is missing");
+check(manifest.includes("SCHEDULE_EXACT_ALARM"), "Exact alarm permission is missing");
 check(manifest.includes("calendar_widget_info"), "Widget metadata is missing");
 
 const mainActivity = read(`java/${PACKAGE.split(".").join("/")}/MainActivity.java`);
@@ -55,6 +57,8 @@ check(buildGradle.includes(`applicationId "${PACKAGE}"`), "Gradle applicationId 
 
 const webIndex = path.join(ROOT, "android", "app", "src", "main", "assets", "public", "index.html");
 check(fs.existsSync(webIndex), "Web assets were not copied into the Android project");
+const webNotify = path.join(ROOT, "android", "app", "src", "main", "assets", "public", "notifications.js");
+check(fs.existsSync(webNotify), "notifications.js was not copied into the Android project");
 
 if (errors.length) {
   console.error("Android verification failed:");
