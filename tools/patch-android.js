@@ -229,8 +229,8 @@ if (keystorePropertiesFile.exists()) {
 // Version: keep Android versionName/versionCode in sync with package.json.
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
 const versionName = pkg.version;
-const versionCode = Math.max(1, Math.round(Number(versionName.split(".")[0]) * 100
-  + Number(versionName.split(".")[1] || 0)));
+const [major, minor, patch] = versionName.split(".").map((part) => Number(part) || 0);
+const versionCode = Math.max(1, major * 10000 + minor * 100 + patch);
 let versioned = fs.readFileSync(gradleFile, "utf8");
 versioned = versioned
   .replace(/versionCode \d+/, `versionCode ${versionCode}`)
