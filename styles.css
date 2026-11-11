@@ -1402,7 +1402,7 @@ html[data-holiday="on"] .island-grass {
 /* вЂ”вЂ”вЂ” РњРµСЃСЏС† вЂ”вЂ”вЂ” */
 
 /* Совсем низкие окна: прячем только лампочки, а снеговик и шапки остаются. */
-@media (min-width: 761px) and (max-height: 620px) {
+@media (min-width: 761px) and (max-height: 520px) {
   html[data-holiday="on"] .garland-lights {
     display: none;
   }
