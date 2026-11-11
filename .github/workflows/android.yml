@@ -113,7 +113,7 @@ jobs:
           "$APKSIGNER" verify --print-certs pixel-calendar-2027-debug.apk
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: pixel-calendar-2027-debug
           path: pixel-calendar-2027-debug.apk
