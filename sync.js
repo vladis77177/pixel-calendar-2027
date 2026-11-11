@@ -95,6 +95,7 @@
       freq: typeof raw.freq === "string" ? raw.freq : "none",
       start: typeof raw.start === "string" ? raw.start : "",
       end: typeof raw.end === "string" ? raw.end : null,
+      time: normalizeTime(raw.time),
       createdAt,
       updatedAt,
       deletedAt: timeMs(raw.deletedAt) || null,

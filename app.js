@@ -393,6 +393,7 @@
           freq,
           start,
           end,
+          time: normalizeTimeValue(raw.time),
           createdAt,
           updatedAt,
           deletedAt: Number(raw.deletedAt) || null,
@@ -455,7 +456,7 @@
         window.PixelSync.scheduleSync(2000);
       }
       if (window.PixelNotify) {
-        window.PixelNotify.schedule(state.tasks, 900);
+        window.PixelNotify.schedule(state.tasks, state.series, 900);
       }
       return true;
     } catch (error) {
@@ -560,7 +561,7 @@
           text: series.text,
           done: Boolean(exception.done),
           createdAt: series.createdAt || 0,
-          time: null,
+          time: series.time || null,
           isSeries: true,
           series
         };
@@ -1290,7 +1291,11 @@
         } else {
           const note = el("span", "series-edit-note", "Изменится вся серия");
           note.title = seriesSchedule(entry.series);
-          form.append(input, note);
+          const timeInput = el("input", "task-edit-time");
+          timeInput.type = "time";
+          timeInput.value = entry.time || "";
+          timeInput.setAttribute("aria-label", "Время напоминания для серии");
+          form.append(input, timeInput, note);
         }
 
         const save = el("button", "task-edit-save");
@@ -1311,7 +1316,7 @@
         const textWrap = el("div", "task-text-wrap");
         textWrap.appendChild(el("span", "task-text", entry.text));
         textWrap.appendChild(el("span", "task-meta", entry.isSeries
-          ? `↻ ${seriesSchedule(entry.series)}`
+          ? `↻ ${seriesSchedule(entry.series)}${entry.time ? ` · ${entry.time}` : ""}`
           : entry.time ? `${entry.time} · напоминание` : "Обычное дело"));
         item.appendChild(textWrap);
 
@@ -1383,12 +1388,9 @@
   function updateRepeatFields() {
     const active = els.taskRepeat.value !== "none";
     els.repeatEndWrap.hidden = !active;
-    els.taskTimeWrap.hidden = active;
-    els.taskTime.disabled = active;
     if (active) {
       els.taskRepeatEnd.min = state.dialogDate || "";
-      els.taskTime.value = "";
-      els.repeatHint.textContent = "Серия появится во всех подходящих днях. Отметки и удаления хранятся отдельно для каждого дня. Напоминание — только для дел без повтора.";
+      els.repeatHint.textContent = "Серия появится во всех подходящих днях, а время включит напоминание в каждый такой день. Отметки и удаления хранятся отдельно для каждого дня.";
     } else {
       els.taskRepeatEnd.value = "";
       els.repeatHint.textContent = "Время включает напоминание в приложении. Повторяющиеся дела видны во всех подходящих днях.";
@@ -1405,7 +1407,7 @@
     }
 
     const repeat = REPEATS.includes(els.taskRepeat.value) ? els.taskRepeat.value : "none";
-    const time = repeat === "none" ? normalizeTimeValue(els.taskTime.value) : null;
+    const time = normalizeTimeValue(els.taskTime.value);
     if (repeat !== "none") {
       const end = els.taskRepeatEnd.value;
       if (end && (!isValidISO(end) || end < state.dialogDate)) {
@@ -1419,12 +1421,13 @@
         freq: repeat,
         start: state.dialogDate,
         end: end || null,
+        time,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         deletedAt: null,
         exceptions: {}
       });
-      showToast("Повторяющаяся серия создана");
+      showToast(time ? `Серия создана · напоминание в ${time}` : "Повторяющаяся серия создана");
     } else {
       const task = {
         id: makeId(),
@@ -1513,14 +1516,16 @@
     if (entry.isSeries) {
       const series = getSeriesById(entry.seriesId);
       if (!series) return;
+      const timeInput = form.querySelector(".task-edit-time");
       series.text = clean.slice(0, 140);
+      series.time = normalizeTimeValue(timeInput ? timeInput.value : series.time);
       series.updatedAt = Date.now();
       state.editingKey = null;
       saveStore();
       renderTaskList();
       refreshDialogSummary();
       updateMainAfterTaskChange();
-      showToast("Название серии обновлено");
+      showToast(series.time ? `Серия обновлена · напоминание в ${series.time}` : "Серия обновлена");
       return;
     }
 
@@ -2275,9 +2280,9 @@
 
   function setupNotifications() {
     if (!window.PixelNotify) return;
-    window.PixelNotify.schedule(state.tasks, 1500);
+    window.PixelNotify.schedule(state.tasks, state.series, 1500);
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) window.PixelNotify.schedule(state.tasks, 600);
+      if (!document.hidden) window.PixelNotify.schedule(state.tasks, state.series, 600);
     });
   }
 

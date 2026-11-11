@@ -51,6 +51,7 @@ test("миграция v2: метки времени, могилы и новые
       text: "Уборка",
       freq: "weekly",
       start: "2026-11-10",
+      time: "10:15",
       createdAt: 222,
       exceptions: {
         "2026-11-17": { done: true },
@@ -73,6 +74,7 @@ test("миграция v2: метки времени, могилы и новые
   const series = migrated.series[0];
   assert.equal(series.updatedAt, 222);
   assert.equal(series.deletedAt, null);
+  assert.equal(series.time, "10:15");
   assert.equal(series.exceptions["2026-11-17"].updatedAt, 222);
   assert.equal(series.exceptions["2026-11-17"].done, true);
   assert.equal(series.exceptions["2026-11-24"].deleted, true);
