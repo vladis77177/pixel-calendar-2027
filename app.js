@@ -2445,7 +2445,7 @@
       if (els.snow.childElementCount) els.snow.replaceChildren();
       return;
     }
-    const count = root.dataset.profile === "mobile" ? 14 : 26;
+    const count = root.dataset.profile === "mobile" ? 28 : 56;
     if (els.snow.childElementCount === count) return;
 
     const fragment = document.createDocumentFragment();
