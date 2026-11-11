@@ -31,6 +31,15 @@
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193;
 }
 
+/* Заголовок периода: пиксельный Tiny5 с полной кириллицей (в Pixelify «б» как «6», нет «Ы»). */
+@font-face {
+  font-family: "Tiny5";
+  src: url("assets/fonts/tiny5.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
 /* Регистрируем цвета неба как анимируемые, чтобы градиент перетекал между фазами. */
 @property --sky-top {
   syntax: "<color>";
@@ -1149,9 +1158,9 @@ html[data-holiday="on"] .island-grass {
 
 .period-copy h2 {
   margin: 0;
-  font-family: var(--font-num);
-  font-size: clamp(28px, 4vw, 39px);
-  font-weight: 800;
+  font-family: "Tiny5", var(--font-pixel);
+  font-size: clamp(32px, 4.6vw, 45px);
+  font-weight: 700;
   line-height: 1.05;
   letter-spacing: 0;
   color: #322213;
@@ -1365,7 +1374,7 @@ html[data-holiday="on"] .island-grass {
   }
 
   .period-copy h2 {
-    font-size: clamp(26px, min(4vw, 3.7vh), 35px);
+    font-size: clamp(32px, min(4.6vw, 5.1vh), 44px);
   }
 
   .progress-card {
@@ -2764,7 +2773,7 @@ html[data-profile="full"] .day-dialog::backdrop {
   }
 
   .period-copy h2 {
-    font-size: clamp(28px, 7.5vw, 35px);
+    font-size: clamp(32px, 8.6vw, 40px);
   }
 
   .progress-card {
