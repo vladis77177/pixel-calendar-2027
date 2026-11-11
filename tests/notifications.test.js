@@ -85,6 +85,8 @@ test("планировщик отправляет серии в плагин и 
   const iso = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
   const scheduled = [];
   const cancelled = [];
+  const registered = [];
+  let actionHandler = null;
   globalThis.Capacitor = {
     isNativePlatform: () => true,
     Plugins: {
@@ -92,12 +94,16 @@ test("планировщик отправляет серии в плагин и 
         getPending: async () => ({ notifications: [{ id: 999 }] }),
         cancel: async (payload) => { cancelled.push(...payload.notifications); },
         checkPermissions: async () => ({ display: "granted" }),
+        registerActionTypes: async (payload) => { registered.push(payload); },
+        addListener: (name, handler) => { actionHandler = handler; return Promise.resolve({ remove() {} }); },
         schedule: async (payload) => { scheduled.push(...payload.notifications); }
       }
     }
   };
 
   try {
+    notify.addActionListener((event) => { actionHandler = event; });
+    assert.ok(actionHandler);
     await notify.resyncAll({}, [{
       id: "s1",
       text: "Полить цветы",
@@ -110,8 +116,12 @@ test("планировщик отправляет серии в плагин и 
     }]);
     assert.ok(scheduled.length > 0);
     assert.ok(scheduled.every((item) => item.extra.seriesId === "s1"));
+    assert.ok(scheduled.every((item) => item.actionTypeId === "calendar-task"));
     assert.ok(scheduled.every((item) => item.schedule.allowWhileIdle === true));
     assert.equal(scheduled[0].body, "Полить цветы");
+    assert.equal(registered.length, 1);
+    assert.equal(registered[0].types[0].id, "calendar-task");
+    assert.deepEqual(registered[0].types[0].actions.map((item) => item.id), ["done", "snooze"]);
     assert.ok(cancelled.some((item) => item.id === 999));
   } finally {
     delete globalThis.Capacitor;
@@ -178,6 +188,35 @@ test("при переполнении у каждой серии остаётс�
       `серия s${index} не должна исчезнуть`
     );
   }
+});
+
+test("отложенная задача сдвигает напоминание", () => {
+  const now = new Date(2026, 10, 11, 8, 0, 0);
+  const until = new Date(2026, 10, 11, 10, 0, 0).getTime();
+  const map = notify.collectReminders({
+    "2026-11-11": [{ id: "t1", text: "Позвонить", time: "09:30", snoozedUntil: until }]
+  }, [], now);
+  const item = map.get(notify.notificationId("t1"));
+  assert.ok(item);
+  assert.equal(item.at.getTime(), until);
+});
+
+test("отложенный день серии сдвигает напоминание", () => {
+  const now = new Date(2026, 10, 11, 8, 0, 0);
+  const until = new Date(2026, 10, 11, 10, 0, 0).getTime();
+  const map = notify.collectReminders({}, [{
+    id: "s1",
+    text: "Полить цветы",
+    freq: "daily",
+    start: "2026-11-11",
+    end: "2026-11-12",
+    time: "09:30",
+    deletedAt: null,
+    exceptions: { "2026-11-11": { snoozedUntil: until, updatedAt: 1 } }
+  }], now);
+  const item = map.get(notify.notificationId("s1@2026-11-11"));
+  assert.ok(item);
+  assert.equal(item.at.getTime(), until);
 });
 
 test("правила повторения в напоминаниях совпадают с календарём", () => {

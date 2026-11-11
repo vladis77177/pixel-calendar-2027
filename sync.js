@@ -63,7 +63,8 @@
       updatedAt,
       deletedAt,
       time: normalizeTime(raw.time),
-      remindAt: normalizeRemindAt(raw.remindAt)
+      remindAt: normalizeRemindAt(raw.remindAt),
+      snoozedUntil: normalizeRemindAt(raw.snoozedUntil)
     };
   }
 
@@ -71,6 +72,8 @@
     const exception = {};
     if (raw && raw.done) exception.done = true;
     if (raw && raw.deleted) exception.deleted = true;
+    const snoozed = normalizeRemindAt(raw && raw.snoozedUntil);
+    if (snoozed) exception.snoozedUntil = snoozed;
     exception.updatedAt = Math.max(timeMs(raw && raw.updatedAt), timeMs(fallbackAt));
     return exception;
   }

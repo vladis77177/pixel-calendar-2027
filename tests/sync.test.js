@@ -43,7 +43,7 @@ test("миграция v2: метки времени, могилы и новые
     version: 2,
     view: "week",
     tasks: {
-      "2026-11-10": [{ id: "a", text: "Полить цветы", done: true, createdAt: 111 }],
+      "2026-11-10": [{ id: "a", text: "Полить цветы", done: true, createdAt: 111, snoozedUntil: 555 }],
       "not-a-date": [{ id: "bad", text: "Мусор", createdAt: 1 }]
     },
     series: [{
@@ -55,7 +55,8 @@ test("миграция v2: метки времени, могилы и новые
       createdAt: 222,
       exceptions: {
         "2026-11-17": { done: true },
-        "2026-11-24": { deleted: true }
+        "2026-11-24": { deleted: true },
+        "2026-11-25": { snoozedUntil: 777 }
       }
     }],
     settings: { showHolidays: false }
@@ -70,6 +71,7 @@ test("миграция v2: метки времени, могилы и новые
   assert.equal(item.deletedAt, null);
   assert.equal(item.time, null);
   assert.equal(item.remindAt, null);
+  assert.equal(item.snoozedUntil, 555);
 
   const series = migrated.series[0];
   assert.equal(series.updatedAt, 222);
@@ -78,6 +80,7 @@ test("миграция v2: метки времени, могилы и новые
   assert.equal(series.exceptions["2026-11-17"].updatedAt, 222);
   assert.equal(series.exceptions["2026-11-17"].done, true);
   assert.equal(series.exceptions["2026-11-24"].deleted, true);
+  assert.equal(series.exceptions["2026-11-25"].snoozedUntil, 777);
   assert.equal(migrated.settings.updatedAt, 0);
 });
 

@@ -14,6 +14,9 @@
   // может быть и через несколько лет (29 февраля), но терять его нельзя.
   const MAX_LOOKAHEAD_DAYS = 1500;
   const MAX_NOTIFICATIONS = 250;
+  const ACTION_TYPE_ID = "calendar-task";
+  const ACTION_DONE = "done";
+  const ACTION_SNOOZE = "snooze";
 
   function plugin() {
     return scope && scope.Capacitor && scope.Capacitor.Plugins && scope.Capacitor.Plugins.LocalNotifications;
@@ -22,6 +25,44 @@
   function isNative() {
     return Boolean(scope && scope.Capacitor && typeof scope.Capacitor.isNativePlatform === "function"
       && scope.Capacitor.isNativePlatform());
+  }
+
+  // Кнопки появляются в каждом напоминании. Регистрируем один раз.
+  let actionsRegistered = null;
+  function registerActions() {
+    if (!isNative() || !plugin()) return Promise.resolve(false);
+    if (!actionsRegistered) {
+      try {
+        actionsRegistered = Promise.resolve(plugin().registerActionTypes({
+          types: [{
+            id: ACTION_TYPE_ID,
+            actions: [
+              { id: ACTION_DONE, title: "Готово" },
+              { id: ACTION_SNOOZE, title: "Отложить на час" }
+            ]
+          }]
+        })).then(() => true).catch(() => false);
+      } catch (error) {
+        actionsRegistered = Promise.resolve(false);
+      }
+    }
+    return actionsRegistered;
+  }
+
+  function addActionListener(handler) {
+    if (!isNative() || !plugin() || typeof handler !== "function") return;
+    try {
+      const listener = plugin().addListener("localNotificationActionPerformed", (event) => {
+        try {
+          handler(event);
+        } catch (error) {
+          // действие не должно ронять приложение
+        }
+      });
+      if (listener && typeof listener.catch === "function") listener.catch(() => {});
+    } catch (error) {
+      // на старых сборках плагина слушателя может не быть
+    }
   }
 
   // Стабильный числовой id для Android: один и тот же ключ всегда даёт тот же id,
@@ -87,7 +128,9 @@
       if (!seriesActiveOn(item, iso)) return false;
       const exception = item.exceptions && item.exceptions[iso];
       if (exception && (exception.deleted || exception.done)) return false;
-      const at = whenFor(iso, item.time);
+      let at = whenFor(iso, item.time);
+      const snoozed = Number(exception && exception.snoozedUntil);
+      if (Number.isFinite(snoozed) && snoozed > floor) at = new Date(snoozed);
       if (!at || at.getTime() <= floor) return false;
       result.push({ iso, at });
       return true;
@@ -146,7 +189,9 @@
     Object.keys(tasks || {}).forEach((iso) => {
       (tasks[iso] || []).forEach((task) => {
         if (!task || task.deletedAt || task.done || !task.time) return;
-        const at = whenFor(iso, task.time);
+        let at = whenFor(iso, task.time);
+        const snoozed = Number(task.snoozedUntil);
+        if (Number.isFinite(snoozed) && snoozed > floor) at = new Date(snoozed);
         if (!at || at.getTime() <= floor) return;
         wanted.set(notificationId(task.id), {
           at,
@@ -217,12 +262,14 @@
     }
     if (!wanted.size || !(await ensurePermission())) return;
 
+    await registerActions();
     try {
       await plugin().schedule({
         notifications: [...wanted.entries()].map(([id, item]) => ({
           id,
           title: "Пиксельный календарь",
           body: item.text,
+          actionTypeId: ACTION_TYPE_ID,
           schedule: { at: item.at, allowWhileIdle: true },
           extra: item.seriesId
             ? { seriesId: item.seriesId, date: item.date }
@@ -261,6 +308,8 @@
     whenFor,
     seriesActiveOn,
     seriesCandidates,
+    registerActions,
+    addActionListener,
     collectReminders,
     ensurePermission,
     cancel,

@@ -356,7 +356,8 @@
               updatedAt: Number(task.updatedAt) || createdAt,
               deletedAt: Number(task.deletedAt) || null,
               time: typeof task.time === "string" ? task.time : null,
-              remindAt: Number(task.remindAt) || null
+              remindAt: Number(task.remindAt) || null,
+              snoozedUntil: Number(task.snoozedUntil) || null
             };
           });
         if (clean.length) tasks[iso] = clean;
@@ -383,6 +384,7 @@
             const clean = { updatedAt: Number(ex.updatedAt) || updatedAt };
             if (ex.done) clean.done = true;
             if (ex.deleted) clean.deleted = true;
+            if (Number(ex.snoozedUntil)) clean.snoozedUntil = Number(ex.snoozedUntil);
             // Пустая отметка хранит время снятия галочки — нужна для слияния.
             exceptions[iso] = clean;
           });
@@ -1468,6 +1470,7 @@
       const exception = series.exceptions[state.dialogDate] || {};
       if (checked) exception.done = true;
       else delete exception.done;
+      if (checked) delete exception.snoozedUntil;
       exception.updatedAt = Date.now();
       // Отметка остаётся даже без done/deleted: время снятия галочки
       // должно побеждать старую отметку с другого устройства.
@@ -1477,6 +1480,7 @@
       const task = (state.tasks[state.dialogDate] || []).find((item) => item.id === entry.taskId);
       if (!task) return;
       task.done = checked;
+      if (checked) task.snoozedUntil = null;
       task.updatedAt = Date.now();
     }
 
@@ -2278,8 +2282,93 @@
     renderSyncStatus(window.PixelSync.getSyncStatus());
   }
 
+  function findTaskById(taskId) {
+    if (!taskId) return null;
+    const days = Object.keys(state.tasks);
+    for (let index = 0; index < days.length; index += 1) {
+      const iso = days[index];
+      const task = (state.tasks[iso] || []).find((item) => item.id === taskId);
+      if (task) return { iso, task };
+    }
+    return null;
+  }
+
+  function markNotificationDone(extra) {
+    if (!extra) return false;
+    const now = Date.now();
+    if (extra.taskId) {
+      const found = findTaskById(extra.taskId);
+      if (!found || found.task.deletedAt || found.task.done) return false;
+      found.task.done = true;
+      found.task.snoozedUntil = null;
+      found.task.updatedAt = now;
+      return true;
+    }
+    if (extra.seriesId && isValidISO(extra.date)) {
+      const series = getSeriesById(extra.seriesId);
+      if (!series || series.deletedAt) return false;
+      const exception = series.exceptions[extra.date] || {};
+      if (exception.deleted || exception.done) return false;
+      exception.done = true;
+      delete exception.snoozedUntil;
+      exception.updatedAt = now;
+      series.exceptions[extra.date] = exception;
+      series.updatedAt = now;
+      return true;
+    }
+    return false;
+  }
+
+  function snoozeNotification(extra) {
+    if (!extra) return false;
+    const now = Date.now();
+    const until = now + 60 * 60 * 1000;
+    if (extra.taskId) {
+      const found = findTaskById(extra.taskId);
+      if (!found || found.task.deletedAt || found.task.done) return false;
+      found.task.snoozedUntil = until;
+      found.task.updatedAt = now;
+      return true;
+    }
+    if (extra.seriesId && isValidISO(extra.date)) {
+      const series = getSeriesById(extra.seriesId);
+      if (!series || series.deletedAt) return false;
+      const exception = series.exceptions[extra.date] || {};
+      if (exception.deleted || exception.done) return false;
+      exception.snoozedUntil = until;
+      exception.updatedAt = now;
+      series.exceptions[extra.date] = exception;
+      series.updatedAt = now;
+      return true;
+    }
+    return false;
+  }
+
+  // Кнопки «Готово» и «Отложить на час» в системном уведомлении.
+  // Событие приходит и после холодного старта: Capacitor придерживает его до подписки.
+  function handleNotificationAction(event) {
+    if (!event) return;
+    const extra = event.notification && event.notification.extra;
+    if (event.actionId === "done") {
+      if (!markNotificationDone(extra)) return;
+      showToast("Отмечено выполненным");
+    } else if (event.actionId === "snooze") {
+      if (!snoozeNotification(extra)) return;
+      showToast("Напомню через час");
+    } else {
+      return;
+    }
+    saveStore();
+    updateMainAfterTaskChange();
+    if (els.dialog.open && state.dialogDate === extra.date) {
+      renderTaskList();
+      refreshDialogSummary();
+    }
+  }
+
   function setupNotifications() {
     if (!window.PixelNotify) return;
+    window.PixelNotify.addActionListener(handleNotificationAction);
     window.PixelNotify.schedule(state.tasks, state.series, 1500);
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) window.PixelNotify.schedule(state.tasks, state.series, 600);
