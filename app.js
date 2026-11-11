@@ -73,6 +73,7 @@
   const els = {
     todayLabel: document.getElementById("todayLabel"),
     todayChip: document.getElementById("todayChip"),
+    garland: document.querySelector(".garland"),
     viewTabs: Array.from(document.querySelectorAll(".view-tab")),
     prevBtn: document.getElementById("prevBtn"),
     nextBtn: document.getElementById("nextBtn"),
@@ -2666,6 +2667,30 @@
     renderSnow();
   }
 
+  // Снеговик стоит вплотную слева от плашки с датой. Отступ считаем по реальным
+  // координатам, потому что на телефоне топбар переносится и ширина плашки меняется.
+  function updateSnowmanAnchor() {
+    if (!els.garland || !els.todayChip) return;
+    const garlandRect = els.garland.getBoundingClientRect();
+    const chipRect = els.todayChip.getBoundingClientRect();
+    if (!garlandRect.width || !chipRect.width) return;
+    const offset = Math.max(8, Math.round(garlandRect.right - chipRect.left + 8));
+    els.garland.style.setProperty("--snowman-right", `${offset}px`);
+  }
+
+  function setupSnowman() {
+    updateSnowmanAnchor();
+    window.addEventListener("resize", updateSnowmanAnchor);
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(updateSnowmanAnchor);
+    }
+    if (typeof ResizeObserver === "function") {
+      const observer = new ResizeObserver(updateSnowmanAnchor);
+      observer.observe(els.todayChip);
+      observer.observe(els.garland);
+    }
+  }
+
   // Снежинки создаём только когда тема активна, декор включён и анимации не выключены.
   function renderSnow() {
     if (!els.snow) return;
@@ -2734,6 +2759,7 @@
     setupInstall();
     registerServiceWorker();
     renderAll(true);
+    setupSnowman();
     document.fonts.ready.then(scheduleFitMonth);
     syncNativeWidget();
   }

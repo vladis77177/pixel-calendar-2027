@@ -403,10 +403,12 @@ html[data-holiday="on"] .garland {
   display: block;
 }
 
-/* Снеговик стоит на верхней кромке панели, правее середины (чтобы не задевать плашку даты). */
+/* Снеговик стоит на верхней кромке панели слева от плашки с датой.
+   Горизонтальный отступ считает app.js: он знает реальную ширину плашки
+   и не ломается при переносе топбара на телефоне. */
 .garland svg.snowman {
   position: absolute;
-  right: 22%;
+  right: var(--snowman-right, 190px);
   bottom: 22px;
   width: 38px;
   height: auto;
@@ -433,9 +435,7 @@ html[data-daytime="night"] .garland svg.snowcap path {
 
 @media (max-width: 760px) {
   .garland svg.snowman {
-    right: 14px;
-    bottom: 0;
-    width: 24px;
+    width: 26px;
     filter: drop-shadow(2px 2px 0 rgba(58, 41, 27, 0.18));
   }
 }
@@ -1401,9 +1401,9 @@ html[data-holiday="on"] .island-grass {
 
 /* вЂ”вЂ”вЂ” РњРµСЃСЏС† вЂ”вЂ”вЂ” */
 
-/* Совсем низкие окна: гирлянда отнимала бы высоту, поэтому прячем её. */
-@media (min-width: 761px) and (max-height: 720px) {
-  html[data-holiday="on"] .garland {
+/* Совсем низкие окна: прячем только лампочки, а снеговик и шапки остаются. */
+@media (min-width: 761px) and (max-height: 620px) {
+  html[data-holiday="on"] .garland-lights {
     display: none;
   }
 
