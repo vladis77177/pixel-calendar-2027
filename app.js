@@ -479,6 +479,8 @@
       label: formatLongDate(date),
       weekday: WEEKDAYS_FULL[date.getDay()],
       holiday: holidayForISO(iso) || "",
+      phase: resolveDaytime(),
+      sky: state.settings.sky || "auto",
       done: entries.filter((entry) => entry.done).length,
       total: entries.length,
       tasks: entries.slice(0, 8).map((entry) => ({

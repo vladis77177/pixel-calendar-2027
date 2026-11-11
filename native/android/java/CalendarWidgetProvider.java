@@ -3,29 +3,26 @@ package __PACKAGE__;
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.view.View;
 import android.widget.RemoteViews;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.util.Calendar;
 import java.util.Locale;
 
 public class CalendarWidgetProvider extends AppWidgetProvider {
-
-    public static final String PREFS = "pixel_widget";
-    public static final String KEY_PAYLOAD = "payload";
+    private static final String PREFS = "pixel_widget";
+    private static final String KEY_PAYLOAD = "payload";
+    private static final int MAX_TASKS = 5;
 
     @Override
-    public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
-        for (int appWidgetId : appWidgetIds) {
-            appWidgetManager.updateAppWidget(appWidgetId, buildViews(context));
+    public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
+        for (int id : ids) {
+            updateWidget(context, manager, id);
         }
     }
 
@@ -41,84 +38,96 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
         }
     }
 
-    public static void updateAll(Context context) {
+    private void updateAll(Context context) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
-        ComponentName component = new ComponentName(context, CalendarWidgetProvider.class);
-        int[] ids = manager.getAppWidgetIds(component);
+        int[] ids = manager.getAppWidgetIds(
+                new android.content.ComponentName(context, CalendarWidgetProvider.class));
         for (int id : ids) {
-            manager.updateAppWidget(id, buildViews(context));
+            updateWidget(context, manager, id);
         }
     }
 
-    private static RemoteViews buildViews(Context context) {
-        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.calendar_widget);
+    private boolean isNight(String sky, String phase) {
+        if (sky == null || sky.isEmpty() || "auto".equals(sky)) {
+            Calendar now = Calendar.getInstance();
+            int hour = now.get(Calendar.HOUR_OF_DAY);
+            return hour >= 21 || hour < 5;
+        }
+        return "night".equals(phase);
+    }
 
-        Locale locale = new Locale("ru", "RU");
-        String weekday = new SimpleDateFormat("EEEE", locale).format(new Date());
-        String label = new SimpleDateFormat("d MMMM yyyy", locale).format(new Date());
-        String holiday = "";
-        int total = 0;
-        int done = 0;
-        String tasksText = "";
-
+    private void updateWidget(Context context, AppWidgetManager manager, int widgetId) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        String payload = prefs.getString(KEY_PAYLOAD, "");
+        String raw = prefs.getString(KEY_PAYLOAD, "");
+        String weekday = "";
+        String label = "";
+        String holiday = "";
+        String phase = "day";
+        String sky = "auto";
+        int done = 0;
+        int total = 0;
+        JSONArray tasks = new JSONArray();
 
         try {
-            if (payload != null && payload.length() > 0) {
-                JSONObject root = new JSONObject(payload);
-                weekday = root.optString("weekday", weekday);
-                label = root.optString("label", label);
-                holiday = root.optString("holiday", "");
-                total = root.optInt("total", 0);
-                done = root.optInt("done", 0);
-
-                JSONArray tasks = root.optJSONArray("tasks");
-                StringBuilder builder = new StringBuilder();
-                int shown = 0;
-                int available = tasks == null ? 0 : tasks.length();
-                for (int index = 0; index < available && shown < 5; index += 1) {
-                    JSONObject task = tasks.optJSONObject(index);
-                    if (task == null) continue;
-                    String text = task.optString("text", "").trim();
-                    if (text.isEmpty()) continue;
-                    if (builder.length() > 0) builder.append('\n');
-                    builder.append(task.optBoolean("done", false) ? "✓ " : "○ ").append(text);
-                    shown += 1;
-                }
-                if (available > shown) {
-                    if (builder.length() > 0) builder.append('\n');
-                    builder.append("… ещё ").append(available - shown);
-                }
-                tasksText = builder.toString();
-            }
-        } catch (Exception ignored) {
-            tasksText = "";
+            JSONObject payload = new JSONObject(raw);
+            weekday = payload.optString("weekday", "");
+            label = payload.optString("label", "");
+            holiday = payload.optString("holiday", "");
+            phase = payload.optString("phase", "day");
+            sky = payload.optString("sky", "auto");
+            done = payload.optInt("done", 0);
+            total = payload.optInt("total", 0);
+            tasks = payload.optJSONArray("tasks");
+            if (tasks == null) tasks = new JSONArray();
+        } catch (Exception error) {
+            // Пустой или повреждённый payload: показываем спокойное пустое состояние.
         }
 
-        if (weekday != null && weekday.length() > 0) {
-            weekday = weekday.substring(0, 1).toUpperCase(locale) + weekday.substring(1);
-        }
+        boolean night = isNight(sky, phase);
+        String packageName = context.getPackageName();
+        RemoteViews views = new RemoteViews(packageName,
+                night ? R.layout.calendar_widget_night : R.layout.calendar_widget);
 
-        views.setTextViewText(R.id.widget_weekday, weekday == null ? "" : weekday);
-        views.setTextViewText(R.id.widget_date, label == null ? "" : label);
+        views.setTextViewText(R.id.widget_weekday, weekday.toUpperCase(new Locale("ru")));
+        views.setTextViewText(R.id.widget_date, label);
         views.setTextViewText(R.id.widget_progress, done + " / " + total);
-        views.setProgressBar(R.id.widget_bar, Math.max(total, 1), done, total == 0);
-
-        if (tasksText.isEmpty()) {
-            views.setViewVisibility(R.id.widget_tasks, View.GONE);
-            views.setViewVisibility(R.id.widget_empty, View.VISIBLE);
-        } else {
-            views.setViewVisibility(R.id.widget_tasks, View.VISIBLE);
-            views.setViewVisibility(R.id.widget_empty, View.GONE);
-            views.setTextViewText(R.id.widget_tasks, tasksText);
-        }
 
         if (holiday.isEmpty()) {
-            views.setViewVisibility(R.id.widget_holiday, View.GONE);
+            views.setViewVisibility(R.id.widget_holiday, RemoteViews.GONE);
         } else {
-            views.setViewVisibility(R.id.widget_holiday, View.VISIBLE);
-            views.setTextViewText(R.id.widget_holiday, "★ " + holiday);
+            views.setViewVisibility(R.id.widget_holiday, RemoteViews.VISIBLE);
+            views.setTextViewText(R.id.widget_holiday, holiday);
+        }
+
+        int maximum = Math.max(total, 1);
+        views.setProgressBar(R.id.widget_bar, maximum, Math.min(done, maximum), total == 0);
+
+        int shown = Math.min(tasks.length(), MAX_TASKS);
+        views.removeAllViews(R.id.widget_tasks_list);
+        for (int index = 0; index < shown; index += 1) {
+            JSONObject task = tasks.optJSONObject(index);
+            if (task == null) continue;
+            boolean isDone = task.optBoolean("done", false);
+            String text = task.optString("text", "");
+            if (task.optBoolean("series", false)) text = "↻ " + text;
+
+            RemoteViews row = new RemoteViews(packageName,
+                    night ? R.layout.widget_task_row_night : R.layout.widget_task_row);
+            row.setTextViewText(R.id.widget_task_mark, isDone ? "✓" : "□");
+            row.setTextViewText(R.id.widget_task_text, text);
+            if (isDone) {
+                row.setTextColor(R.id.widget_task_mark, night ? 0xFF6D7C99 : 0xFF9A8B74);
+                row.setTextColor(R.id.widget_task_text, night ? 0xFF8E9AB5 : 0xFF8E7F6A);
+            }
+            views.addView(R.id.widget_tasks_list, row);
+        }
+
+        views.setViewVisibility(R.id.widget_empty, shown == 0 ? RemoteViews.VISIBLE : RemoteViews.GONE);
+        if (tasks.length() > shown) {
+            views.setViewVisibility(R.id.widget_more, RemoteViews.VISIBLE);
+            views.setTextViewText(R.id.widget_more, "ещё " + (tasks.length() - shown));
+        } else {
+            views.setViewVisibility(R.id.widget_more, RemoteViews.GONE);
         }
 
         Intent launchIntent = new Intent(context, MainActivity.class);
@@ -131,6 +140,6 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
         );
         views.setOnClickPendingIntent(R.id.widget_root, pendingIntent);
 
-        return views;
+        manager.updateAppWidget(widgetId, views);
     }
 }

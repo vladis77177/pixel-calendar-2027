@@ -1,0 +1,187 @@
+/* Ночная тема мини-виджета: те же формы, приглушённая бумага и луна. */
+html[data-daytime="night"] {
+  color-scheme: dark;
+  --ink: #f2e8d5;
+  --ink-soft: #c9bfa8;
+  --line: #0b1020;
+  --paper: #202a44;
+  --paper-deep: #2b3650;
+  --green: #8ad969;
+  --green-dark: #3d7448;
+  --green-light: #31523d;
+  --gold: #ffd45f;
+  --red: #ff8a7a;
+}
+
+html[data-daytime="night"] body {
+  background:
+    radial-gradient(circle at 76% 12%, rgba(255, 244, 190, 0.12) 0 52px, transparent 53px),
+    linear-gradient(180deg, #0b1020 0%, #141d36 55%, #202a44 100%);
+}
+
+html[data-daytime="night"] .widget-sun {
+  display: none;
+}
+
+html[data-daytime="night"] .widget-cloud {
+  display: none;
+}
+
+html[data-daytime="night"] .widget-moon {
+  position: absolute;
+  top: 26px;
+  right: 28px;
+  width: 34px;
+  height: 34px;
+  background: #ffe9a8;
+  box-shadow:
+    inset -8px 0 0 #202a44,
+    inset 0 -8px 0 #f4d77e;
+}
+
+html[data-daytime="night"] .widget-sky::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #fff6cf;
+  box-shadow:
+    28px 38px 0 #fff6cf, 74px 18px 0 #d9e6ff, 128px 52px 0 #fff6cf,
+    176px 24px 0 #d9e6ff, 236px 64px 0 #fff6cf, 292px 44px 0 #fff6cf,
+    348px 26px 0 #d9e6ff, 46px 94px 0 #fff6cf, 152px 108px 0 #fff6cf,
+    214px 92px 0 #d9e6ff, 306px 112px 0 #fff6cf, 366px 88px 0 #d9e6ff;
+  width: 3px;
+  height: 3px;
+  opacity: 0.8;
+}
+
+html[data-daytime="night"] .widget-shell {
+  background: var(--paper);
+  border-color: var(--line);
+  box-shadow: 6px 6px 0 #070b16;
+}
+
+html[data-daytime="night"] .widget-top {
+  border-color: var(--line);
+}
+
+html[data-daytime="night"] .widget-date-card {
+  background: var(--paper-deep);
+  border-color: #43506e;
+  box-shadow: 4px 4px 0 #0b1020;
+}
+
+html[data-daytime="night"] .widget-plan,
+html[data-daytime="night"] .widget-bar,
+html[data-daytime="night"] .widget-task {
+  border-color: #43506e;
+}
+
+html[data-daytime="night"] .widget-bar {
+  background: #0f172a;
+}
+
+html[data-daytime="night"] .widget-task {
+  background: #263149;
+}
+
+html[data-daytime="night"] .widget-check {
+  background: #202a44;
+  border-color: #8ad969;
+}
+
+html[data-daytime="night"] .widget-task.is-done .widget-task-text {
+  color: #8e9ab5;
+}
+
+html[data-daytime="night"] .widget-input {
+  background: #131c31;
+  border-color: #43506e;
+  color: var(--ink);
+}
+
+html[data-daytime="night"] .widget-input::placeholder {
+  color: #8e9ab5;
+}
+
+html[data-daytime="night"] .widget-footer {
+  border-color: #43506e;
+  color: #8e9ab5;
+}
+
+html[data-daytime="night"] .widget-empty {
+  border-color: #43506e;
+  color: #c9bfa8;
+}
+
+/* Явные цвета: часть текста в widget.css задана hex-ами, а не переменными. */
+html[data-daytime="night"] .widget-eyebrow {
+  color: #9fd28a;
+}
+
+html[data-daytime="night"] .widget-title {
+  color: #f2e8d5;
+}
+
+html[data-daytime="night"] .widget-weekday {
+  color: #b9e6a4;
+}
+
+html[data-daytime="night"] .widget-day {
+  color: #f2e8d5;
+  text-shadow: 2px 2px 0 rgba(11, 16, 32, 0.6);
+}
+
+html[data-daytime="night"] .widget-month {
+  color: #d6e8c8;
+}
+
+html[data-daytime="night"] .widget-year {
+  background: #33445f;
+  border-color: #6d7c99;
+  color: #f2e8d5;
+}
+
+html[data-daytime="night"] .widget-holiday {
+  color: #ffb3a7;
+}
+
+html[data-daytime="night"] .widget-clock {
+  color: #cfe3bd;
+}
+
+html[data-daytime="night"] .widget-plan {
+  background: #263149;
+}
+
+html[data-daytime="night"] .widget-plan-head {
+  color: #c9bfa8;
+}
+
+html[data-daytime="night"] .widget-plan-head strong {
+  color: #b9e6a4;
+}
+
+html[data-daytime="night"] .widget-task-text {
+  color: #f2e8d5;
+}
+
+html[data-daytime="night"] .widget-task.is-done .widget-task-text {
+  color: #8e9ab5;
+}
+
+html[data-daytime="night"] .widget-task-meta {
+  color: #aebbd4;
+}
+
+html[data-daytime="night"] .widget-repeat {
+  color: #8fb8e8;
+}
+
+html[data-daytime="night"] .widget-more {
+  color: #aebbd4;
+}
+
+/* Угловой блик на зелёной карточке выглядел случайным белым пятном. */
+.widget-date-card::after {
+  display: none;
+}

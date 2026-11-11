@@ -92,12 +92,15 @@
       view: "month",
       tasks: {},
       series: [],
-      settings: { showHolidays: true }
+      settings: { showHolidays: true, sky: "auto" }
     };
     if (!parsed || typeof parsed !== "object") return result;
 
     if (["week", "month", "quarter", "year"].includes(parsed.view)) result.view = parsed.view;
     if (parsed.settings && parsed.settings.showHolidays === false) result.settings.showHolidays = false;
+    if (parsed.settings && ["auto", "day", "dawn", "dusk", "night"].includes(parsed.settings.sky)) {
+      result.settings.sky = parsed.settings.sky;
+    }
 
     if (parsed.tasks && typeof parsed.tasks === "object" && !Array.isArray(parsed.tasks)) {
       Object.keys(parsed.tasks).forEach((iso) => {
@@ -105,10 +108,12 @@
         const clean = parsed.tasks[iso]
           .filter((task) => task && typeof task.text === "string" && task.text.trim())
           .map((task) => ({
+            ...task,
             id: typeof task.id === "string" && task.id ? task.id : makeId(),
             text: task.text.trim().slice(0, 140),
             done: Boolean(task.done),
-            createdAt: Number(task.createdAt) || Date.now()
+            createdAt: Number(task.createdAt) || Date.now(),
+            updatedAt: Number(task.updatedAt) || Number(task.createdAt) || Date.now()
           }));
         if (clean.length) result.tasks[iso] = clean;
       });
@@ -117,7 +122,7 @@
     if (Array.isArray(parsed.series)) {
       parsed.series.forEach((raw) => {
         if (!raw || typeof raw.text !== "string" || !raw.text.trim()) return;
-        if (!["daily", "weekdays", "weekly", "monthly"].includes(raw.freq) || !isValidISO(raw.start)) return;
+        if (!["daily", "weekdays", "weekly", "monthly", "yearly"].includes(raw.freq) || !isValidISO(raw.start)) return;
         let end = isValidISO(raw.end) ? raw.end : null;
         if (end && end < raw.start) end = null;
         const exceptions = {};
@@ -126,19 +131,21 @@
             if (!isValidISO(iso)) return;
             const ex = raw.exceptions[iso];
             if (!ex || typeof ex !== "object") return;
-            const clean = {};
-            if (ex.done) clean.done = true;
-            if (ex.deleted) clean.deleted = true;
-            if (clean.done || clean.deleted) exceptions[iso] = clean;
+            const clean = { ...ex, updatedAt: Number(ex.updatedAt) || Date.now() };
+            if (!ex.done) delete clean.done;
+            if (!ex.deleted) delete clean.deleted;
+            if (!Number(ex.snoozedUntil)) delete clean.snoozedUntil;
+            if (clean.done || clean.deleted || clean.snoozedUntil) exceptions[iso] = clean;
           });
         }
         result.series.push({
+          ...raw,
           id: typeof raw.id === "string" && raw.id ? raw.id : makeId(),
           text: raw.text.trim().slice(0, 140),
           freq: raw.freq,
           start: raw.start,
           end,
-          createdAt: Number(raw.createdAt) || Date.now(),
+          updatedAt: Number(raw.updatedAt) || Number(raw.createdAt) || Date.now(),
           exceptions
         });
       });
@@ -159,7 +166,7 @@
       syncNativeWidget();
       return true;
     } catch (error) {
-      showToast("Не удалось сохранить");
+      showToast("Не удалось сохранить изменения");
       return false;
     }
   }
@@ -362,7 +369,23 @@
     }
   }
 
+  function resolveDaytime() {
+    const mode = data.settings.sky;
+    if (mode && mode !== "auto") return mode;
+    const now = new Date();
+    const hour = now.getHours() + now.getMinutes() / 60;
+    if (hour >= 5 && hour < 8) return "dawn";
+    if (hour >= 8 && hour < 17) return "day";
+    if (hour >= 17 && hour < 21) return "dusk";
+    return "night";
+  }
+
+  function applyDaytime() {
+    document.documentElement.dataset.daytime = resolveDaytime();
+  }
+
   function renderAll() {
+    applyDaytime();
     renderDate();
     renderTasks();
   }
@@ -447,6 +470,7 @@
   });
 
   window.setInterval(() => {
+    applyDaytime();
     const current = toISO(startOfDay(new Date()));
     if (current !== knownToday) renderAll();
     else els.clock.textContent = `${pad2(new Date().getHours())}:${pad2(new Date().getMinutes())}`;

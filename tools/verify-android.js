@@ -36,8 +36,22 @@ check(
 read(`java/${PACKAGE.split(".").join("/")}/WidgetBridgePlugin.java`);
 read(`java/${PACKAGE.split(".").join("/")}/CalendarWidgetProvider.java`);
 read("res/layout/calendar_widget.xml");
+read("res/layout/calendar_widget_night.xml");
+read("res/layout/widget_task_row.xml");
+read("res/layout/widget_task_row_night.xml");
 read("res/drawable/widget_bg.xml");
+read("res/drawable/widget_bg_night.xml");
+read("res/drawable/widget_header_bg.xml");
+read("res/drawable/widget_header_bg_night.xml");
+read("res/drawable/widget_task_bg.xml");
+read("res/drawable/widget_task_bg_night.xml");
+read("res/drawable/widget_progress.xml");
+read("res/drawable/widget_progress_night.xml");
 read("res/xml/calendar_widget_info.xml");
+
+const widgetFont = path.join(APP, "res", "font", "tiny5.ttf");
+check(fs.existsSync(widgetFont), "Missing widget font res/font/tiny5.ttf");
+if (fs.existsSync(widgetFont)) check(fs.statSync(widgetFont).size > 1000, "Empty widget font res/font/tiny5.ttf");
 
 const strings = read("res/values/strings.xml");
 check(strings.includes("widget_label"), "widget_label string is missing");

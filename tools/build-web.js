@@ -15,6 +15,7 @@ const FILES = [
   "notifications.js",
   "widget.html",
   "widget.css",
+  "widget-night.css",
   "widget.js",
   "sw.js",
   "manifest.webmanifest",
