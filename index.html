@@ -211,15 +211,15 @@
         </div>
 
         <div class="utility-tools" role="group" aria-label="Инструменты календаря">
-          <button class="pixel-btn tool-btn" id="searchBtn" type="button" aria-label="Открыть поиск и фильтры">
+          <button class="pixel-btn tool-btn" id="searchBtn" type="button" aria-label="Открыть поиск и фильтры" title="Поиск и фильтры">
             <svg class="icon"><use href="#i-search"></use></svg>
             <span>Поиск</span>
           </button>
-          <a class="pixel-btn tool-btn" href="widget.html" aria-label="Открыть мини-виджет на сегодня">
+          <a class="pixel-btn tool-btn" href="widget.html" aria-label="Открыть мини-виджет на сегодня" title="Мини-виджет на сегодня">
             <svg class="icon"><use href="#i-widget"></use></svg>
             <span>Виджет</span>
           </a>
-          <button class="pixel-btn tool-btn" id="settingsBtn" type="button" aria-label="Открыть настройки, резервные копии и Google Календарь">
+          <button class="pixel-btn tool-btn" id="settingsBtn" type="button" aria-label="Открыть настройки, резервные копии и Google Календарь" title="Настройки и данные">
             <svg class="icon"><use href="#i-settings"></use></svg>
             <span>Настройки</span>
           </button>
@@ -265,7 +265,7 @@
       </section>
 
       <footer class="panel-footer">
-        <p class="save-note"><span class="save-dot" aria-hidden="true"></span> Всё сохраняется автоматически в этом браузере</p>
+        <p class="save-note"><span class="save-dot" aria-hidden="true"></span> <span id="saveNoteText">Всё сохраняется автоматически в этом браузере</span></p>
         <p class="pixel-signature">Данные, праздники и Google Календарь — в настройках</p>
       </footer>
     </main>
@@ -322,6 +322,7 @@
                 <option value="weekdays">По будням</option>
                 <option value="weekly">Каждую неделю</option>
                 <option value="monthly">Каждый месяц</option>
+                <option value="yearly">Каждый год</option>
               </select>
             </label>
             <label class="repeat-field repeat-end" id="repeatEndWrap" for="taskRepeatEnd" hidden>

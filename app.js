@@ -26,7 +26,7 @@
     holiday: "auto",
     weekStart: 1
   };
-  const REPEATS = ["none", "daily", "weekdays", "weekly", "monthly"];
+  const REPEATS = ["none", "daily", "weekdays", "weekly", "monthly", "yearly"];
   const MAX_SEARCH_RESULTS = 100;
   const MONTHS_NOMINATIVE = [
     "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
@@ -136,6 +136,7 @@
     installBtn: document.getElementById("installBtn"),
     installNote: document.getElementById("installNote"),
     settingsMeta: document.getElementById("settingsMeta"),
+    saveNoteText: document.getElementById("saveNoteText"),
     toast: document.getElementById("toast"),
     toastText: document.getElementById("toastText")
   };
@@ -463,6 +464,9 @@
     if (series.freq === "weekdays") return date.getDay() >= 1 && date.getDay() <= 5;
     if (series.freq === "weekly") return diff % 7 === 0 && date.getDay() === start.getDay();
     if (series.freq === "monthly") return date.getDate() === start.getDate();
+    if (series.freq === "yearly") {
+      return date.getMonth() === start.getMonth() && date.getDate() === start.getDate();
+    }
     return false;
   }
 
@@ -525,8 +529,10 @@
     } else if (series.freq === "weekly") {
       const weekday = WEEKDAYS_LONG_MONDAY_FIRST[(start.getDay() + 6) % 7].toLowerCase();
       label = `каждый ${weekday}`;
-    } else {
+    } else if (series.freq === "monthly") {
       label = `${start.getDate()}-го числа каждого месяца`;
+    } else {
+      label = `${start.getDate()} ${MONTHS_GENITIVE[start.getMonth()]} — каждый год`;
     }
     if (series.end) label += ` · до ${formatLongDate(fromISO(series.end))}`;
     return label;
@@ -969,6 +975,42 @@
     return wrapper;
   }
 
+  // Подгоняет высоту строк месяца под окно: на сайте и планшете весь месяц
+  // должен быть виден без прокрутки. Узкие экраны не трогаем.
+  function fitMonthView() {
+    const root = document.documentElement;
+    if (state.view !== "month" || !window.matchMedia("(min-width: 761px)").matches) {
+      root.style.removeProperty("--month-row");
+      delete root.dataset.monthFit;
+      return;
+    }
+
+    const grid = els.calendarView.querySelector(".month-grid");
+    if (!grid) return;
+
+    const rows = Math.max(1, Math.round(grid.children.length / 7));
+    // Координата от начала документа: прокрутка не должна влиять на высоту строк.
+    const top = grid.getBoundingClientRect().top + window.scrollY;
+    const available = window.innerHeight - top - 10;
+    let gap = 6;
+    let raw = Math.floor((available - gap * (rows - 1)) / rows);
+    if (raw < 88) {
+      gap = 4;
+      raw = Math.floor((available - gap * (rows - 1)) / rows);
+    }
+    const rowHeight = Math.max(48, Math.min(130, raw));
+
+    root.style.setProperty("--month-row", `${rowHeight}px`);
+    root.dataset.monthFit = rowHeight < 62 ? "tight" : (rowHeight < 88 ? "compact" : "full");
+  }
+
+  let fitMonthTimer = 0;
+
+  function scheduleFitMonth() {
+    window.clearTimeout(fitMonthTimer);
+    fitMonthTimer = window.setTimeout(fitMonthView, 80);
+  }
+
   function renderCalendar(animate) {
     let viewNode;
     if (state.view === "week") viewNode = renderWeekView();
@@ -977,6 +1019,10 @@
     else viewNode = renderMonthView();
 
     els.calendarView.replaceChildren(viewNode);
+    fitMonthView();
+    window.clearTimeout(fitMonthTimer);
+    // Повторный расчёт после загрузки шрифтов и переносов в тулбаре.
+    fitMonthTimer = window.setTimeout(fitMonthView, 150);
     window.clearTimeout(enterTimer);
 
     if (animate) {
@@ -1833,8 +1879,10 @@
     } else if (series.freq === "weekly") {
       const days = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
       rule = `FREQ=WEEKLY;BYDAY=${days[start.getDay()]}`;
-    } else {
+    } else if (series.freq === "monthly") {
       rule = `FREQ=MONTHLY;BYMONTHDAY=${start.getDate()}`;
+    } else {
+      rule = `FREQ=YEARLY;BYMONTH=${start.getMonth() + 1};BYMONTHDAY=${start.getDate()}`;
     }
     if (series.end) rule += `;UNTIL=${icsDate(series.end)}T235959Z`;
     return `RRULE:${rule}`;
@@ -2309,6 +2357,8 @@
         applyHoliday();
       }
     });
+
+    window.addEventListener("resize", scheduleFitMonth);
   }
 
   function closeToolSearch() {
@@ -2433,6 +2483,11 @@
     root.dataset.motion = state.settings.motion === "off" ? "off" : "on";
     root.dataset.decor = state.settings.decor ? "on" : "off";
     root.dataset.dialogAnim = resolveDialogAnimation(profile) ? "on" : "off";
+    if (els.saveNoteText) {
+      els.saveNoteText.textContent = native
+        ? "Всё сохраняется на устройстве"
+        : "Всё сохраняется автоматически в этом браузере";
+    }
     renderSnow();
   }
 
@@ -2445,6 +2500,7 @@
     setupInstall();
     registerServiceWorker();
     renderAll(true);
+    document.fonts.ready.then(scheduleFitMonth);
     syncNativeWidget();
   }
 

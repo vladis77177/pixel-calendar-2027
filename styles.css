@@ -86,6 +86,12 @@
   --shadow-hard: 0 5px 0 var(--line);
   --font-pixel: "Pixelify Sans", "Trebuchet MS", sans-serif;
   --font-body: "Nunito", "Segoe UI", sans-serif;
+  --font-num: "Nunito", "Segoe UI", sans-serif;
+  --text-2xs: 10px;
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 14px;
+  --text-lg: 19px;
   transition:
     --sky-top 1.2s ease,
     --sky-mid 1.2s ease,
@@ -868,7 +874,7 @@ html[data-holiday="on"] .island-grass {
 
 .today-label {
   font-family: var(--font-pixel);
-  font-size: 10px;
+  font-size: 10.5px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #577a43;
@@ -1141,9 +1147,10 @@ html[data-holiday="on"] .island-grass {
 }
 
 .progress-value {
-  font-family: var(--font-pixel);
+  font-family: var(--font-num);
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
   color: #3d5e2d;
 }
 
@@ -1169,7 +1176,7 @@ html[data-holiday="on"] .island-grass {
   margin: 5px 0 0;
   overflow: hidden;
   color: #6f5a3b;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -1203,6 +1210,142 @@ html[data-holiday="on"] .island-grass {
   contain: layout style;
 }
 
+/* Месяц целиком на экране: высоту строк задаёт fitMonthView() в app.js. */
+@media (min-width: 761px) {
+  html[data-month-fit] .month-grid {
+    grid-auto-rows: var(--month-row, 116px);
+  }
+
+  html[data-month-fit] .day-cell {
+    height: var(--month-row, 116px);
+    min-height: 0;
+  }
+
+  html[data-month-fit="compact"] .month-grid,
+  html[data-month-fit="tight"] .month-grid {
+    gap: 4px;
+  }
+
+  html[data-month-fit="compact"] .day-cell,
+  html[data-month-fit="tight"] .day-cell {
+    padding: 6px 7px;
+  }
+
+  /* compact: одна строка задачи; tight: только точки вместо списка */
+  html[data-month-fit="compact"] .day-tasks,
+  html[data-month-fit="tight"] .day-tasks {
+    display: flex;
+    margin-top: 3px;
+  }
+
+  html[data-month-fit="compact"] .day-tasks > :nth-child(n+2) {
+    display: none;
+  }
+
+  html[data-month-fit="tight"] .day-tasks,
+  html[data-month-fit="compact"] .day-dots {
+    display: none;
+  }
+
+  html[data-month-fit="tight"] .day-dots {
+    display: flex;
+    margin-top: 3px;
+  }
+
+  html[data-month-fit="compact"] .day-holiday,
+  html[data-month-fit="tight"] .day-holiday {
+    display: none;
+  }
+}
+
+/* Низкие окна: поджимаем шапку, чтобы сетка получила больше высоты. */
+@media (min-width: 761px) and (max-height: 1050px) {
+  .page-shell {
+    padding-top: clamp(10px, 2vh, 22px);
+  }
+
+  .topbar {
+    padding-bottom: clamp(8px, 1.5vh, 16px);
+  }
+
+  .brand-copy {
+    padding: 5px 11px 6px;
+  }
+
+  .brand-title {
+    font-size: clamp(30px, min(4.2vw, 4.6vh), 44px);
+  }
+
+  .logo-block {
+    width: clamp(46px, 6.4vh, 58px);
+    height: clamp(46px, 6.4vh, 58px);
+  }
+
+  .game-panel {
+    padding: clamp(10px, 1.7vh, 18px);
+    animation: none;
+  }
+
+  .toolbar {
+    margin-bottom: clamp(6px, 1.2vh, 12px);
+  }
+
+  .view-tab {
+    min-height: 38px;
+  }
+
+  .quick-add {
+    margin-bottom: 10px;
+    padding: 6px 8px;
+  }
+
+  .quick-add-input,
+  .quick-add-btn {
+    min-height: 34px;
+  }
+
+  .quick-add-input {
+    padding-block: 4px;
+  }
+
+  .calendar-card {
+    padding: clamp(8px, 1.3vh, 14px);
+  }
+
+  .calendar-head {
+    margin-bottom: 6px;
+  }
+
+  .period-kicker {
+    margin-bottom: 1px;
+  }
+
+  .period-copy h2 {
+    font-size: clamp(26px, min(4vw, 3.7vh), 35px);
+  }
+
+  .progress-card {
+    padding: 6px 10px 5px;
+  }
+
+  .progress-track {
+    margin-top: 3px;
+  }
+
+  .progress-note {
+    margin-top: 3px;
+  }
+
+  .calendar-tip {
+    display: none;
+  }
+
+  .panel-footer {
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+}
+
 /* вЂ”вЂ”вЂ” РњРµСЃСЏС† вЂ”вЂ”вЂ” */
 
 .month-calendar {
@@ -1220,9 +1363,9 @@ html[data-holiday="on"] .island-grass {
 .weekday-name {
   padding: 3px 2px 5px;
   font-family: var(--font-pixel);
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   text-align: center;
   color: #6b5432;
@@ -1298,9 +1441,10 @@ html[data-holiday="on"] .island-grass {
 }
 
 .day-number {
-  font-family: var(--font-pixel);
-  font-size: 19px;
-  font-weight: 700;
+  font-family: var(--font-num);
+  font-size: var(--text-lg);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
   color: #4b371f;
 }
@@ -1327,11 +1471,12 @@ html[data-holiday="on"] .island-grass {
   min-height: 16px;
   padding: 1px 4px;
   border: 1px solid var(--line);
-  font-family: var(--font-pixel);
-  font-size: 8.5px;
-  font-weight: 600;
+  font-family: var(--font-num);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.01em;
   white-space: nowrap;
 }
 
@@ -1363,7 +1508,7 @@ html[data-holiday="on"] .island-grass {
   background: #edfadd;
   border-left: 3px solid #6dbd4e;
   color: #355c28;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -1381,7 +1526,7 @@ html[data-holiday="on"] .island-grass {
   padding-left: 4px;
   color: #6f5a3b;
   font-family: var(--font-pixel);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
 }
 
@@ -1498,9 +1643,10 @@ html[data-holiday="on"] .island-grass {
 }
 
 .week-date {
-  font-family: var(--font-pixel);
+  font-family: var(--font-num);
   font-size: 23px;
-  font-weight: 700;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
   color: #47321d;
 }
@@ -2433,7 +2579,7 @@ html[data-profile="full"] .day-dialog::backdrop {
   }
 
   .task-pill {
-    font-size: 9.8px;
+    font-size: 10px;
   }
 
   .week-day {
@@ -2507,7 +2653,7 @@ html[data-profile="full"] .day-dialog::backdrop {
   }
 
   .today-label {
-    font-size: 8px;
+    font-size: 9.5px;
   }
 
   .today-copy strong {
@@ -2887,7 +3033,7 @@ html[data-profile="full"] .day-dialog::backdrop {
   margin-top: 2px;
   overflow: hidden;
   color: #9c3329;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -2944,7 +3090,7 @@ html[data-profile="full"] .day-dialog::backdrop {
   margin-top: 2px;
   overflow: hidden;
   color: #7b6442;
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 800;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -3310,22 +3456,23 @@ html[data-profile="full"] .tool-dialog::backdrop {
 }
 
 .search-day {
-  font-family: var(--font-pixel);
+  font-family: var(--font-num);
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
   color: #3f2e1d;
 }
 
 .search-month {
   color: #70573b;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
 }
 
 .search-year {
   color: #8a7453;
-  font-size: 8.5px;
+  font-size: 10px;
   font-weight: 800;
 }
 
@@ -3358,7 +3505,7 @@ html[data-profile="full"] .tool-dialog::backdrop {
   border: 1px solid #b99d6b;
   color: #6f5333;
   font-family: var(--font-pixel);
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -3821,8 +3968,8 @@ html[data-profile="full"] .tool-dialog::backdrop {
   }
 
   .brand-eyebrow {
-    font-size: 8px;
-    letter-spacing: 0.1em;
+    font-size: 10px;
+    letter-spacing: 0.08em;
   }
 
   .brand-title {
@@ -3908,7 +4055,7 @@ html[data-profile="full"] .tool-dialog::backdrop {
   }
 
   .weekday-name {
-    font-size: 8.5px;
+    font-size: 10px;
     letter-spacing: 0.03em;
   }
 
@@ -3918,7 +4065,7 @@ html[data-profile="full"] .tool-dialog::backdrop {
   }
 
   .day-number {
-    font-size: 14px;
+    font-size: 15px;
   }
 
   .day-top {
@@ -4018,7 +4165,7 @@ html[data-profile="full"] .tool-dialog::backdrop {
   }
 
   .day-number {
-    font-size: 13px;
+    font-size: 14.5px;
   }
 
   .day-dots {
@@ -4026,19 +4173,19 @@ html[data-profile="full"] .tool-dialog::backdrop {
   }
 
   .task-count {
-    font-size: 7px;
+    font-size: 9px;
   }
 
   .weekday-name {
-    font-size: 8px;
+    font-size: 9.5px;
   }
 
   .mini-day {
-    font-size: 11px;
+    font-size: 11.5px;
   }
 
   .mini-weekday {
-    font-size: 8px;
+    font-size: 9px;
   }
 
   .mini-title {
@@ -4095,6 +4242,22 @@ html[data-profile="full"] .tool-dialog::backdrop {
 
   .mini-title {
     font-size: 14px;
+  }
+}
+
+/* На узких ноутбуках тулбар должен оставаться в одну строку. */
+@media (min-width: 761px) and (max-width: 1100px) {
+  .view-tab {
+    padding-inline: 12px;
+  }
+
+  .toolbar {
+    gap: 10px;
+  }
+
+  /* Иконки без подписей: подписи не помещаются в одну строку с видами. */
+  .utility-tools .tool-btn span {
+    display: none;
   }
 }
 
