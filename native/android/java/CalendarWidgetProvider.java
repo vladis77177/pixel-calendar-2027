@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.view.View;
 import android.widget.RemoteViews;
 
 import org.json.JSONArray;
@@ -93,9 +94,9 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
         views.setTextViewText(R.id.widget_progress, done + " / " + total);
 
         if (holiday.isEmpty()) {
-            views.setViewVisibility(R.id.widget_holiday, RemoteViews.GONE);
+            views.setViewVisibility(R.id.widget_holiday, View.GONE);
         } else {
-            views.setViewVisibility(R.id.widget_holiday, RemoteViews.VISIBLE);
+            views.setViewVisibility(R.id.widget_holiday, View.VISIBLE);
             views.setTextViewText(R.id.widget_holiday, holiday);
         }
 
@@ -122,12 +123,12 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
             views.addView(R.id.widget_tasks_list, row);
         }
 
-        views.setViewVisibility(R.id.widget_empty, shown == 0 ? RemoteViews.VISIBLE : RemoteViews.GONE);
+        views.setViewVisibility(R.id.widget_empty, shown == 0 ? View.VISIBLE : View.GONE);
         if (tasks.length() > shown) {
-            views.setViewVisibility(R.id.widget_more, RemoteViews.VISIBLE);
+            views.setViewVisibility(R.id.widget_more, View.VISIBLE);
             views.setTextViewText(R.id.widget_more, "ещё " + (tasks.length() - shown));
         } else {
-            views.setViewVisibility(R.id.widget_more, RemoteViews.GONE);
+            views.setViewVisibility(R.id.widget_more, View.GONE);
         }
 
         Intent launchIntent = new Intent(context, MainActivity.class);
