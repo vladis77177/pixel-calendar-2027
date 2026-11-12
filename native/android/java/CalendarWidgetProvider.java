@@ -48,7 +48,7 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
         }
     }
 
-    private boolean isNight(String sky, String phase) {
+    private static boolean isNight(String sky, String phase) {
         if (sky == null || sky.isEmpty() || "auto".equals(sky)) {
             Calendar now = Calendar.getInstance();
             int hour = now.get(Calendar.HOUR_OF_DAY);
