@@ -180,6 +180,8 @@
       label: formatLongDate(date),
       weekday: WEEKDAYS_FULL[date.getDay()],
       holiday: holidayFor(iso) || "",
+      phase: resolveDaytime(),
+      sky: data.settings.sky || "auto",
       done: entries.filter((entry) => entry.done).length,
       total: entries.length,
       tasks: entries.slice(0, 8).map((entry) => ({
@@ -381,7 +383,11 @@
   }
 
   function applyDaytime() {
-    document.documentElement.dataset.daytime = resolveDaytime();
+    const phase = resolveDaytime();
+    const root = document.documentElement;
+    if (root.dataset.daytime === phase) return;
+    root.dataset.daytime = phase;
+    syncNativeWidget();
   }
 
   function renderAll() {
