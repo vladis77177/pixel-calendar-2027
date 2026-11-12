@@ -243,7 +243,7 @@ input:focus-visible {
   flex: 0 0 auto;
 }
 
-/* вЂ”вЂ”вЂ” РџРёРєСЃРµР»СЊРЅС‹Р№ РјРёСЂ РЅР° С„РѕРЅРµ вЂ”вЂ”вЂ” */
+/* ——— Пиксельный мир на фоне ——— */
 
 .world {
   position: fixed;
@@ -787,7 +787,7 @@ html[data-holiday="on"] .island-grass {
     inset -4px -3px 0 #b8443f;
 }
 
-/* вЂ”вЂ”вЂ” РћР±С‰Р°СЏ СЂР°СЃРєР»Р°РґРєР° вЂ”вЂ”вЂ” */
+/* ——— Общая раскладка ——— */
 
 .page-shell {
   position: relative;
@@ -935,7 +935,7 @@ html[data-holiday="on"] .island-grass {
   white-space: nowrap;
 }
 
-/* вЂ”вЂ”вЂ” РћСЃРЅРѕРІРЅР°СЏ РїР°РЅРµР»СЊ вЂ”вЂ”вЂ” */
+/* ——— Основная панель ——— */
 
 .game-panel {
   position: relative;
@@ -1123,7 +1123,7 @@ html[data-holiday="on"] .island-grass {
   border: 2px solid var(--line);
 }
 
-/* вЂ”вЂ”вЂ” РљР°СЂС‚РѕС‡РєР° РєР°Р»РµРЅРґР°СЂСЏ вЂ”вЂ”вЂ” */
+/* ——— Карточка календаря ——— */
 
 .calendar-card {
   padding: clamp(10px, 1.7vw, 18px);
@@ -1401,7 +1401,7 @@ html[data-holiday="on"] .island-grass {
   }
 }
 
-/* вЂ”вЂ”вЂ” РњРµСЃСЏС† вЂ”вЂ”вЂ” */
+/* ——— Месяц ——— */
 
 /* Совсем низкие окна: прячем только лампочки, а снеговик и шапки остаются. */
 @media (min-width: 761px) and (max-height: 520px) {
@@ -1634,7 +1634,7 @@ html[data-holiday="on"] .island-grass {
   height: 12px;
 }
 
-/* вЂ”вЂ”вЂ” РќРµРґРµР»СЏ вЂ”вЂ”вЂ” */
+/* ——— Неделя ——— */
 
 .week-grid {
   display: grid;
@@ -1791,7 +1791,7 @@ html[data-holiday="on"] .island-grass {
   height: 12px;
 }
 
-/* вЂ”вЂ”вЂ” РљРІР°СЂС‚Р°Р» Рё РіРѕРґ вЂ”вЂ”вЂ” */
+/* ——— Квартал и год ——— */
 
 .months-grid {
   display: grid;
@@ -1920,7 +1920,7 @@ html[data-holiday="on"] .island-grass {
   aspect-ratio: 1;
 }
 
-/* вЂ”вЂ”вЂ” Р¤СѓС‚РµСЂ РїР°РЅРµР»Рё вЂ”вЂ”вЂ” */
+/* ——— Футер панели ——— */
 
 .panel-footer {
   display: flex;
@@ -1995,7 +1995,7 @@ html[data-holiday="on"] .island-grass {
   transform: scale(0.7);
 }
 
-/* вЂ”вЂ”вЂ” Р”РёР°Р»РѕРі РґРЅСЏ вЂ”вЂ”вЂ” */
+/* ——— Диалог дня ——— */
 
 .day-dialog {
   width: min(510px, calc(100vw - 28px));
@@ -2471,7 +2471,7 @@ html[data-profile="full"] .day-dialog::backdrop {
   font-weight: 800;
 }
 
-/* вЂ”вЂ”вЂ” РўРѕСЃС‚ вЂ”вЂ”вЂ” */
+/* ——— Тост ——— */
 
 .toast {
   position: fixed;
@@ -2513,7 +2513,118 @@ html[data-profile="full"] .day-dialog::backdrop {
     inset 0 2px 0 #b9f397;
 }
 
-/* вЂ”вЂ”вЂ” РђРЅРёРјР°С†РёРё вЂ”вЂ”вЂ” */
+/* ——— Обновление ——— */
+
+.update-bar {
+  position: fixed;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  z-index: 320;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(600px, calc(100vw - 24px));
+  padding: 10px 12px;
+  background: var(--paper);
+  border: 3px solid var(--line);
+  box-shadow: 0 5px 0 var(--line);
+  color: var(--ink);
+  transform: translateX(-50%);
+}
+
+.update-bar[hidden] {
+  display: none;
+}
+
+.update-badge {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  background: var(--green);
+  border: 2px solid var(--line);
+  box-shadow: inset 0 2px 0 #b9f397;
+  color: #17310f;
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.update-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.update-copy strong {
+  font-family: var(--font-pixel);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.update-copy span {
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.update-action {
+  flex: 0 0 auto;
+  padding: 7px 11px;
+  font-size: 12px;
+}
+
+.update-close {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  padding: 0;
+  background: transparent;
+  border: 2px solid transparent;
+  color: var(--ink-soft);
+  font-family: var(--font-body);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.update-close:hover,
+.update-close:focus-visible {
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+body.has-update-bar .toast {
+  bottom: calc(max(18px, env(safe-area-inset-bottom)) + 84px);
+}
+
+@media (max-width: 520px) {
+  .update-bar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .update-copy {
+    flex-basis: calc(100% - 84px);
+  }
+
+  .update-action {
+    order: 3;
+    width: 100%;
+  }
+}
+
+/* ——— Анимации ——— */
 
 .calendar-view.is-entering .day-cell,
 .calendar-view.is-entering .week-day,
@@ -2628,7 +2739,7 @@ html[data-profile="full"] .day-dialog::backdrop {
   }
 }
 
-/* вЂ”вЂ”вЂ” РџР»Р°РЅС€РµС‚С‹ вЂ”вЂ”вЂ” */
+/* ——— Планшеты ——— */
 
 @media (max-width: 980px) {
   .page-shell {

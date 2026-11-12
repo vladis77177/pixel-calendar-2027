@@ -146,7 +146,12 @@
     syncNowBtn: document.getElementById("syncNowBtn"),
     syncStatus: document.getElementById("syncStatus"),
     toast: document.getElementById("toast"),
-    toastText: document.getElementById("toastText")
+    toastText: document.getElementById("toastText"),
+    updateBar: document.getElementById("updateBar"),
+    updateTitle: document.getElementById("updateTitle"),
+    updateText: document.getElementById("updateText"),
+    updateAction: document.getElementById("updateAction"),
+    updateDismiss: document.getElementById("updateDismiss")
   };
 
   const initialToday = startOfDay(new Date());
@@ -2732,12 +2737,200 @@
     });
   }
 
+  // ——— Обновления ———
+
+  const RELEASE_API = "https://api.github.com/repos/vladis77177/pixel-calendar-2027/releases/latest";
+  const RELEASE_APK = "https://github.com/vladis77177/pixel-calendar-2027/releases/latest/download/pixel-calendar-2027-debug.apk";
+  const UPDATE_DISMISS_KEY = "pixel-calendar-update-dismissed";
+  const RELEASE_CACHE_KEY = "pixel-calendar-release-check";
+  const RELEASE_CHECK_INTERVAL = 12 * 60 * 60 * 1000;
+  let updateKind = "";
+  let updateVersion = "";
+  let updateTarget = null;
+  let reloadForUpdate = false;
+
+  function currentVersion() {
+    const info = window.__BUILD_INFO__;
+    return info && info.version ? String(info.version) : "";
+  }
+
+  function isNewerVersion(remote, local) {
+    const helper = window.PixelUpdate;
+    if (helper && typeof helper.isNewer === "function") return helper.isNewer(remote, local);
+    return false;
+  }
+
+  function normalizeReleaseVersion(tag) {
+    const helper = window.PixelUpdate;
+    if (helper && typeof helper.normalizeTag === "function") return helper.normalizeTag(tag);
+    return String(tag || "").replace(/^v/i, "");
+  }
+
+  function hideUpdateBar() {
+    if (!els.updateBar) return;
+    els.updateBar.hidden = true;
+    document.body.classList.remove("has-update-bar");
+    updateKind = "";
+    updateVersion = "";
+    updateTarget = null;
+  }
+
+  function showUpdateBar(kind, title, text, label, action) {
+    if (!els.updateBar || !els.updateTitle || !els.updateText || !els.updateAction) return;
+    updateKind = kind;
+    updateTarget = action;
+    els.updateTitle.textContent = title;
+    els.updateText.textContent = text;
+    els.updateAction.textContent = label;
+    els.updateBar.hidden = false;
+    document.body.classList.add("has-update-bar");
+  }
+
+  function dismissedUpdate(kind, version) {
+    try {
+      const parsed = JSON.parse(sessionStorage.getItem(UPDATE_DISMISS_KEY) || "null");
+      return Boolean(parsed && parsed.kind === kind && (version ? parsed.version === version : true));
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function rememberDismissed(kind, version) {
+    try {
+      sessionStorage.setItem(UPDATE_DISMISS_KEY, JSON.stringify({ kind, version: version || "" }));
+    } catch (error) {
+      // Приватный режим: плашка просто вернётся после перезагрузки.
+    }
+  }
+
+  function offerWebUpdate(worker) {
+    if (!worker || !navigator.serviceWorker.controller) return;
+    if (dismissedUpdate("web")) return;
+    showUpdateBar(
+      "web",
+      "Доступна новая версия",
+      "Страница перезагрузится и покажет свежие правки.",
+      "Обновить",
+      () => {
+        reloadForUpdate = true;
+        if (els.updateAction) {
+          els.updateAction.textContent = "Обновляем…";
+          els.updateAction.disabled = true;
+        }
+        worker.postMessage({ type: "SKIP_WAITING" });
+      }
+    );
+  }
+
+  function offerAppRelease(version, url) {
+    if (!version || !isNewerVersion(version, currentVersion())) return;
+    if (dismissedUpdate("apk", version)) return;
+    updateVersion = version;
+    showUpdateBar(
+      "apk",
+      `Доступна версия ${version}`,
+      "Скачайте APK и установите поверх — дела и настройки сохранятся.",
+      "Скачать",
+      () => {
+        // В WebView APK ссылка уходит в системный браузер через ACTION_VIEW.
+        const link = document.createElement("a");
+        link.href = url || RELEASE_APK;
+        link.target = "_blank";
+        link.rel = "noopener";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+    );
+  }
+
+  function readReleaseCache() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(RELEASE_CACHE_KEY) || "null");
+      if (!parsed || typeof parsed !== "object") return null;
+      return {
+        at: Number(parsed.at) || 0,
+        version: typeof parsed.version === "string" ? parsed.version : "",
+        url: typeof parsed.url === "string" ? parsed.url : RELEASE_APK
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function writeReleaseCache(version, url) {
+    try {
+      localStorage.setItem(RELEASE_CACHE_KEY, JSON.stringify({ at: Date.now(), version, url }));
+    } catch (error) {
+      // Кэш проверки не критичен.
+    }
+  }
+
+  function setupUpdateBar() {
+    if (els.updateAction) {
+      els.updateAction.addEventListener("click", () => {
+        const action = updateTarget;
+        if (typeof action === "function") action();
+      });
+    }
+    if (els.updateDismiss) {
+      els.updateDismiss.addEventListener("click", () => {
+        rememberDismissed(updateKind, updateVersion);
+        hideUpdateBar();
+      });
+    }
+  }
+
+  function setupAppUpdateCheck() {
+    if (!isNativeApp() || !currentVersion()) return;
+    const cached = readReleaseCache();
+    if (cached && cached.version && Date.now() - cached.at < RELEASE_CHECK_INTERVAL) {
+      offerAppRelease(cached.version, cached.url);
+      return;
+    }
+
+    window.setTimeout(() => {
+      fetch(RELEASE_API, { headers: { Accept: "application/vnd.github+json" } })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((release) => {
+          if (!release || !release.tag_name) return;
+          const version = normalizeReleaseVersion(release.tag_name);
+          if (!version) return;
+          let url = RELEASE_APK;
+          if (Array.isArray(release.assets)) {
+            const asset = release.assets.find((item) => item && typeof item.name === "string" && /\.apk$/i.test(item.name));
+            if (asset && asset.browser_download_url) url = asset.browser_download_url;
+          }
+          writeReleaseCache(version, url);
+          offerAppRelease(version, url);
+        })
+        .catch(() => {
+          // Нет сети или GitHub недоступен — молча ждём следующего запуска.
+        });
+    }, 4000);
+  }
+
   function registerServiceWorker() {
     const capacitor = window.Capacitor;
     if (capacitor && typeof capacitor.isNativePlatform === "function" && capacitor.isNativePlatform()) return;
     if (!("serviceWorker" in navigator) || !/^https?:$/.test(window.location.protocol)) return;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (reloadForUpdate) window.location.reload();
+    });
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("./sw.js").catch(() => {
+      navigator.serviceWorker.register("./sw.js").then((registration) => {
+        offerWebUpdate(registration.waiting);
+        registration.addEventListener("updatefound", () => {
+          const worker = registration.installing;
+          if (!worker) return;
+          worker.addEventListener("statechange", () => {
+            if (worker.state === "installed") offerWebUpdate(worker);
+          });
+        });
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") registration.update().catch(() => {});
+        });
+      }).catch(() => {
         // Offline mode is a bonus; the calendar works without it.
       });
     });
@@ -2876,7 +3069,9 @@
     setupSync();
     setupNotifications();
     setupInstall();
+    setupUpdateBar();
     registerServiceWorker();
+    setupAppUpdateCheck();
     renderAll(true);
     setupSnowman();
     document.fonts.ready.then(scheduleFitMonth);

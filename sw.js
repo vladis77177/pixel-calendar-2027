@@ -1,14 +1,16 @@
-const CACHE_NAME = "pixel-calendar-2027-v21";
+const CACHE_NAME = "pixel-calendar-2027-v22";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.mobile.css",
   "./app.js",
+  "./update.js",
   "./sync.js",
   "./notifications.js",
   "./widget.html",
   "./widget.css",
+  "./widget-night.css",
   "./widget.js",
   "./manifest.webmanifest",
   "./favicon.svg",
@@ -25,10 +27,13 @@ const ASSETS = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(ASSETS))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
   );
+});
+
+self.addEventListener("message", (event) => {
+  const data = event.data;
+  if (data && data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
