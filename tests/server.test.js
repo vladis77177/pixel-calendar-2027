@@ -87,7 +87,8 @@ test("сервер синхронизации", async (t) => {
       PORT: String(port),
       HOST: "127.0.0.1",
       SYNC_TOKEN: TOKEN,
-      SYNC_DATA_DIR: dataDir
+      SYNC_DATA_DIR: dataDir,
+      SYNC_BACKUPS: "3"
     },
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -176,5 +177,54 @@ test("сервер синхронизации", async (t) => {
       headers: { ...headers, Origin: "https://evil.example" }
     });
     assert.equal(denied.headers.get("access-control-allow-origin"), null);
+  });
+
+  await t.test("копии состояний хранятся по датам и не растут бесконечно", async () => {
+    // Пишем пять раз: лимит копий задан SYNC_BACKUPS=3.
+    for (let index = 0; index < 5; index += 1) {
+      const state = body({ "2026-11-10": [makeTask({ text: `Задача ${index}`, updatedAt: 1000 + index })] });
+      const response = await fetch(`${base}/api/state`, { method: "POST", headers, body: JSON.stringify(state) });
+      assert.equal(response.status, 200);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    const dir = path.join(dataDir, "backups");
+    const files = fs.readdirSync(dir).filter((name) => name.endsWith(".json"));
+    assert.equal(files.length, 3, `ожидалось 3 копии, найдено: ${files.join(", ")}`);
+    assert.ok(files.every((name) => /^state-\d{8}-\d{6}-\d{3}\.json$/.test(name)), "имена копий датированы");
+    for (const name of files) {
+      const saved = JSON.parse(fs.readFileSync(path.join(dir, name), "utf8"));
+      assert.equal(saved.version, 4, "копия должна быть валидным состоянием");
+    }
+    // Последняя прокручивающаяся копия на месте и содержит предыдущее состояние.
+    const rolling = JSON.parse(fs.readFileSync(path.join(dataDir, "state.bak.json"), "utf8"));
+    assert.equal(rolling.version, 4);
+  });
+
+  await t.test("повреждённый state.json поднимается из копии", async () => {
+    const dir = path.join(dataDir, "backups");
+    const files = fs.readdirSync(dir).filter((name) => name.endsWith(".json")).sort().reverse();
+    assert.ok(files.length > 0, "нужна хотя бы одна копия для проверки восстановления");
+    fs.writeFileSync(path.join(dataDir, "state.json"), "{ это не json");
+    fs.writeFileSync(path.join(dataDir, "state.bak.json"), "{ и это тоже");
+
+    // Читаем состояние только при запуске, поэтому поднимаем второй сервер
+    // на том же каталоге данных.
+    const secondPort = await freePort();
+    const second = spawn(process.execPath, [path.join(ROOT, "sync-server", "server.js")], {
+      env: {
+        ...process.env,
+        PORT: String(secondPort),
+        HOST: "127.0.0.1",
+        SYNC_TOKEN: TOKEN,
+        SYNC_DATA_DIR: dataDir
+      },
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    t.after(() => second.kill());
+    await waitForServer(second);
+
+    const response = await fetch(`http://127.0.0.1:${secondPort}/api/state`, { headers });
+    const data = await response.json();
+    assert.ok(data.tasks["2026-11-10"], "состояние восстановлено из датированной копии");
   });
 });

@@ -3,6 +3,9 @@
 ((root) => {
   "use strict";
 
+  const REPO = "vladis77177/pixel-calendar-2027";
+  const APK_NAME = "pixel-calendar-2027-debug.apk";
+
   function parts(value) {
     const match = String(value || "")
       .trim()
@@ -30,7 +33,27 @@
     return /^\d/.test(value) ? value : "";
   }
 
-  const api = { parts, isNewer, normalizeTag };
+  // Ссылка на файл всегда ведёт на последний релиз. Ссылку конкретного релиза
+  // подставлять нельзя: вместе с ней кэш проверки уводил на устаревший APK.
+  function apkDownloadUrl() {
+    return `https://github.com/${REPO}/releases/latest/download/${APK_NAME}`;
+  }
+
+  function releaseApiUrl() {
+    return `https://api.github.com/repos/${REPO}/releases/latest`;
+  }
+
+  // Пора ли сходить в сеть за свежим релизом вместо кэша.
+  function shouldRecheck(cachedAt, now, interval) {
+    const at = Number(cachedAt) || 0;
+    const current = Number(now) || 0;
+    const limit = Number(interval) || 0;
+    if (at <= 0) return true;
+    if (limit <= 0) return true;
+    return current - at >= limit;
+  }
+
+  const api = { parts, isNewer, normalizeTag, apkDownloadUrl, releaseApiUrl, shouldRecheck };
 
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   root.PixelUpdate = api;

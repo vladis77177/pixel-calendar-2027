@@ -2952,11 +2952,17 @@
 
   // ——— Обновления ———
 
-  const RELEASE_API = "https://api.github.com/repos/vladis77177/pixel-calendar-2027/releases/latest";
-  const RELEASE_APK = "https://github.com/vladis77177/pixel-calendar-2027/releases/latest/download/pixel-calendar-2027-debug.apk";
+  const RELEASE_API = window.PixelUpdate
+    ? window.PixelUpdate.releaseApiUrl()
+    : "https://api.github.com/repos/vladis77177/pixel-calendar-2027/releases/latest";
+  const RELEASE_APK = window.PixelUpdate
+    ? window.PixelUpdate.apkDownloadUrl()
+    : "https://github.com/vladis77177/pixel-calendar-2027/releases/latest/download/pixel-calendar-2027-debug.apk";
   const UPDATE_DISMISS_KEY = "pixel-calendar-update-dismissed";
   const RELEASE_CACHE_KEY = "pixel-calendar-release-check";
-  const RELEASE_CHECK_INTERVAL = 12 * 60 * 60 * 1000;
+  // Кэш показывается сразу и живёт офлайн сколько угодно, но в сеть ходим
+  // не реже раза в полчаса: иначе свежий релиз замечается только через сутки.
+  const RELEASE_RECHECK_INTERVAL = 30 * 60 * 1000;
   let updateKind = "";
   let updateVersion = "";
   let updateTarget = null;
@@ -3061,19 +3067,20 @@
     try {
       const parsed = JSON.parse(localStorage.getItem(RELEASE_CACHE_KEY) || "null");
       if (!parsed || typeof parsed !== "object") return null;
+      // Ссылка из кэша не используется: в старых версиях туда попадала ссылка
+      // конкретного релиза, и она уводила на устаревший APK.
       return {
         at: Number(parsed.at) || 0,
-        version: typeof parsed.version === "string" ? parsed.version : "",
-        url: typeof parsed.url === "string" ? parsed.url : RELEASE_APK
+        version: typeof parsed.version === "string" ? parsed.version : ""
       };
     } catch (error) {
       return null;
     }
   }
 
-  function writeReleaseCache(version, url) {
+  function writeReleaseCache(version) {
     try {
-      localStorage.setItem(RELEASE_CACHE_KEY, JSON.stringify({ at: Date.now(), version, url }));
+      localStorage.setItem(RELEASE_CACHE_KEY, JSON.stringify({ at: Date.now(), version }));
     } catch (error) {
       // Кэш проверки не критичен.
     }
@@ -3094,33 +3101,52 @@
     }
   }
 
+  function shouldRecheckRelease(cached) {
+    const helper = window.PixelUpdate;
+    if (helper && typeof helper.shouldRecheck === "function") {
+      return helper.shouldRecheck(cached ? cached.at : 0, Date.now(), RELEASE_RECHECK_INTERVAL);
+    }
+    if (!cached || !cached.at) return true;
+    return Date.now() - cached.at >= RELEASE_RECHECK_INTERVAL;
+  }
+
+  let releaseCheckInFlight = false;
+
+  function refreshRelease() {
+    if (releaseCheckInFlight) return;
+    releaseCheckInFlight = true;
+    fetch(RELEASE_API, { headers: { Accept: "application/vnd.github+json" } })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((release) => {
+        if (!release || !release.tag_name) return;
+        const version = normalizeReleaseVersion(release.tag_name);
+        if (!version) return;
+        writeReleaseCache(version);
+        if (!isNewerVersion(version, currentVersion())) {
+          // Свежий ответ — истина: если последний релиз не новее установленного
+          // (например, релиз откатили), плашку снимаем.
+          hideUpdateBar();
+          return;
+        }
+        offerAppRelease(version, RELEASE_APK);
+      })
+      .catch(() => {
+        // Нет сети или GitHub недоступен — показываем кэш и ждём следующей попытки.
+      })
+      .then(() => {
+        releaseCheckInFlight = false;
+      });
+  }
+
   function setupAppUpdateCheck() {
     if (!isNativeApp() || !currentVersion()) return;
     const cached = readReleaseCache();
-    if (cached && cached.version && Date.now() - cached.at < RELEASE_CHECK_INTERVAL) {
-      offerAppRelease(cached.version, cached.url);
-      return;
-    }
-
-    window.setTimeout(() => {
-      fetch(RELEASE_API, { headers: { Accept: "application/vnd.github+json" } })
-        .then((response) => (response.ok ? response.json() : null))
-        .then((release) => {
-          if (!release || !release.tag_name) return;
-          const version = normalizeReleaseVersion(release.tag_name);
-          if (!version) return;
-          let url = RELEASE_APK;
-          if (Array.isArray(release.assets)) {
-            const asset = release.assets.find((item) => item && typeof item.name === "string" && /\.apk$/i.test(item.name));
-            if (asset && asset.browser_download_url) url = asset.browser_download_url;
-          }
-          writeReleaseCache(version, url);
-          offerAppRelease(version, url);
-        })
-        .catch(() => {
-          // Нет сети или GitHub недоступен — молча ждём следующего запуска.
-        });
-    }, 4000);
+    if (cached && cached.version) offerAppRelease(cached.version, RELEASE_APK);
+    if (shouldRecheckRelease(cached)) window.setTimeout(refreshRelease, cached ? 1500 : 4000);
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible") return;
+      if (shouldRecheckRelease(readReleaseCache())) refreshRelease();
+    });
   }
 
   function registerServiceWorker() {

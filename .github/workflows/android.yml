@@ -9,6 +9,8 @@ on:
       - "styles.css"
       - "app.mobile.css"
       - "app.js"
+      - "update.js"
+      - "series-stats.js"
       - "widget.html"
       - "widget.css"
       - "widget.js"
@@ -47,6 +49,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
+
+      - name: Run checks
+        run: npm run check && npm test
 
       - name: Build web assets
         run: npm run build:web

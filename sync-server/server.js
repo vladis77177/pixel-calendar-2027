@@ -17,6 +17,8 @@ const DATA_DIR = process.env.SYNC_DATA_DIR
   : path.join(ROOT, "data");
 const STATE_FILE = path.join(DATA_DIR, "state.json");
 const BACKUP_FILE = path.join(DATA_DIR, "state.bak.json");
+const BACKUP_DIR = path.join(DATA_DIR, "backups");
+const BACKUP_KEEP = Number(process.env.SYNC_BACKUPS) > 0 ? Number(process.env.SYNC_BACKUPS) : 14;
 const TOKEN_FILE = path.join(DATA_DIR, "token.txt");
 const PORT = Number(process.env.PORT) || 8787;
 const HOST = process.env.HOST || "0.0.0.0";
@@ -50,7 +52,7 @@ function loadToken() {
 }
 
 function loadState() {
-  for (const file of [STATE_FILE, BACKUP_FILE]) {
+  for (const file of stateCandidates()) {
     try {
       return migrateState(JSON.parse(fs.readFileSync(file, "utf8")));
     } catch (error) {
@@ -60,13 +62,45 @@ function loadState() {
   return migrateState({});
 }
 
+// Основной файл, затем последняя копия, затем датированные копии от новых к старым.
+function stateCandidates() {
+  const list = [STATE_FILE, BACKUP_FILE];
+  try {
+    const dated = fs.readdirSync(BACKUP_DIR)
+      .filter((name) => /^state-\d{8}-\d{6}-\d{3}\.json$/.test(name))
+      .sort()
+      .reverse()
+      .slice(0, 5);
+    for (const name of dated) list.push(path.join(BACKUP_DIR, name));
+  } catch (error) {
+    // каталога копий ещё нет
+  }
+  return list;
+}
+
 const token = loadToken();
 let serverState = loadState();
+
+// Копия перед каждой записью: state.bak.json (последнее состояние) плюс
+// датированные копии в backups/, чтобы неудачное слияние не затёрло единственный файл.
+function rotateBackup() {
+  if (!fs.existsSync(STATE_FILE)) return;
+  fs.copyFileSync(STATE_FILE, BACKUP_FILE);
+  fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  const stamp = new Date().toISOString().slice(0, 23).replace(/[-:]/g, "").replace("T", "-").replace(".", "-");
+  fs.copyFileSync(STATE_FILE, path.join(BACKUP_DIR, `state-${stamp}.json`));
+  const saved = fs.readdirSync(BACKUP_DIR)
+    .filter((name) => /^state-\d{8}-\d{6}-\d{3}\.json$/.test(name))
+    .sort();
+  for (const name of saved.slice(0, Math.max(0, saved.length - BACKUP_KEEP))) {
+    fs.rmSync(path.join(BACKUP_DIR, name), { force: true });
+  }
+}
 
 function persist(next) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   try {
-    if (fs.existsSync(STATE_FILE)) fs.copyFileSync(STATE_FILE, BACKUP_FILE);
+    rotateBackup();
   } catch (error) {
     console.warn("Не удалось сделать резервную копию:", error.message);
   }
@@ -242,6 +276,7 @@ server.listen(PORT, HOST, () => {
   });
   console.log(`  Код подключения: ${token}`);
   console.log(`  Данные: ${STATE_FILE}`);
+  console.log(`  Копии:  ${BACKUP_DIR} (до ${BACKUP_KEEP} шт.)`);
   console.log("");
   console.log("  Оставьте окно открытым. Остановить — Ctrl+C.");
   console.log("");
