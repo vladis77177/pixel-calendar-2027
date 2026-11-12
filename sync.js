@@ -1,9 +1,11 @@
-// Схема данных v3 и слияние состояний для будущей синхронизации.
+// Схема данных v4 и слияние состояний для будущей синхронизации.
 // Модуль не зависит от DOM: его же использует localStorage-клиент и тесты (node --test).
 (function (root) {
   "use strict";
 
-  const SCHEMA_VERSION = 3;
+  const SCHEMA_VERSION = 4;
+  // За сколько до срока напоминать. null — ровно в срок.
+  const LEAD_MINUTES = [10, 60, 1440];
   const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
   const ISO_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
   // Дублируем значения из app.js: sync.js должен работать без DOM.
@@ -17,6 +19,7 @@
     sky: "auto",
     holiday: "auto",
     weekStart: 1,
+    morningDigest: false,
     updatedAt: 0
   };
 
@@ -27,8 +30,14 @@
     return {
       ...DEFAULT_SETTINGS,
       ...source,
+      morningDigest: source.morningDigest === true,
       updatedAt: timeMs(source.updatedAt)
     };
+  }
+
+  function normalizeLead(value) {
+    const number = Number(value);
+    return LEAD_MINUTES.includes(number) ? number : null;
   }
 
   function timeMs(value) {
@@ -49,7 +58,7 @@
     return `task-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
 
-  // Приводит задачу/серию к виду v3. Старые записи получают updatedAt = createdAt,
+  // Приводит задачу/серию к виду v4. Старые записи получают updatedAt = createdAt,
   // а deletedAt остаётся пустым: миграция ничего не удаляет.
   function normalizeTask(raw, fallbackNow) {
     const createdAt = timeMs(raw.createdAt) || fallbackNow;
@@ -64,7 +73,8 @@
       deletedAt,
       time: normalizeTime(raw.time),
       remindAt: normalizeRemindAt(raw.remindAt),
-      snoozedUntil: normalizeRemindAt(raw.snoozedUntil)
+      snoozedUntil: normalizeRemindAt(raw.snoozedUntil),
+      leadMinutes: normalizeLead(raw.leadMinutes)
     };
   }
 
@@ -99,6 +109,7 @@
       start: typeof raw.start === "string" ? raw.start : "",
       end: typeof raw.end === "string" ? raw.end : null,
       time: normalizeTime(raw.time),
+      leadMinutes: normalizeLead(raw.leadMinutes),
       createdAt,
       updatedAt,
       deletedAt: timeMs(raw.deletedAt) || null,

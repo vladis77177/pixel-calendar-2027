@@ -233,3 +233,95 @@ test("правила повторения в напоминаниях совпа
   assert.equal(notify.seriesActiveOn({ ...base, freq: "daily", deletedAt: 1 }, "2026-11-11"), false);
   assert.equal(notify.seriesActiveOn({ ...base, freq: "daily", end: "2026-11-10" }, "2026-11-11"), false);
 });
+
+test("заранее сдвигает напоминание и называет реальное время", () => {
+  const now = new Date(2026, 10, 11, 8, 0, 0);
+  const map = notify.collectReminders({
+    "2026-11-11": [{ id: "t1", text: "Позвонить", time: "10:00", leadMinutes: 10 }]
+  }, [], now);
+
+  const item = map.get(notify.notificationId("t1"));
+  assert.ok(item);
+  assert.equal(item.at.getHours(), 9);
+  assert.equal(item.at.getMinutes(), 50);
+  assert.equal(item.text, "За 10 мин · 10:00 Позвонить");
+});
+
+test("если заранее уже прошло, напоминаем в срок", () => {
+  const now = new Date(2026, 10, 11, 9, 55, 0);
+  const map = notify.collectReminders({
+    "2026-11-11": [{ id: "t1", text: "Позвонить", time: "10:00", leadMinutes: 10 }]
+  }, [], now);
+
+  const item = map.get(notify.notificationId("t1"));
+  assert.ok(item);
+  assert.equal(item.at.getHours(), 10);
+  assert.equal(item.at.getMinutes(), 0);
+});
+
+test("отложенное важнее заблаговременного напоминания", () => {
+  const now = new Date(2026, 10, 11, 8, 0, 0);
+  const until = new Date(2026, 10, 11, 10, 0, 0).getTime();
+  const map = notify.collectReminders({
+    "2026-11-11": [{
+      id: "t1",
+      text: "Позвонить",
+      time: "09:30",
+      leadMinutes: 60,
+      snoozedUntil: until
+    }]
+  }, [], now);
+
+  const item = map.get(notify.notificationId("t1"));
+  assert.ok(item);
+  assert.equal(item.at.getTime(), until);
+  assert.equal(item.text, "Отложено · 09:30 Позвонить");
+});
+
+test("серия напоминает заранее в каждый подходящий день", () => {
+  const now = new Date(2026, 10, 11, 8, 0, 0);
+  const map = notify.collectReminders({}, [{
+    id: "s1",
+    text: "Полить цветы",
+    freq: "daily",
+    start: "2026-11-11",
+    end: "2026-11-11",
+    time: "09:30",
+    leadMinutes: 60,
+    deletedAt: null,
+    exceptions: {}
+  }], now);
+
+  const item = map.get(notify.notificationId("s1@2026-11-11"));
+  assert.ok(item);
+  assert.equal(item.at.getHours(), 8);
+  assert.equal(item.at.getMinutes(), 30);
+  assert.equal(item.text, "За час · 09:30 Полить цветы");
+});
+
+test("утренняя сводка молчит, пока её не включили", () => {
+  const now = new Date(2026, 10, 11, 7, 0, 0);
+  const tasks = { "2026-11-11": [{ id: "t1", text: "Позвонить" }] };
+  assert.equal(notify.collectDigest(tasks, [], now, { morningDigest: false }).size, 0);
+  assert.equal(notify.collectDigest(tasks, [], now, null).size, 0);
+});
+
+test("утренняя сводка собирает дела и пропускает пустые дни", () => {
+  const now = new Date(2026, 10, 11, 7, 0, 0);
+  const tasks = {
+    "2026-11-11": [
+      { id: "t1", text: "Позвонить" },
+      { id: "t2", text: "Сделано", done: true }
+    ],
+    "2026-11-12": [{ id: "t3", text: "Купить хлеб" }]
+  };
+  const map = notify.collectDigest(tasks, [], now, { morningDigest: true });
+
+  assert.equal(map.size, 2);
+  const first = map.get(notify.notificationId("digest@2026-11-11"));
+  assert.ok(first);
+  assert.equal(first.title, "Утренняя сводка");
+  assert.equal(first.at.getHours(), 8);
+  assert.equal(first.text, "Дел: 1 дело · Позвонить");
+  assert.equal(map.has(notify.notificationId("digest@2026-11-13")), false);
+});

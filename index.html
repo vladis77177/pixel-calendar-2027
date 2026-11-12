@@ -375,6 +375,15 @@
               <span>Время</span>
               <input class="task-time" id="taskTime" name="time" type="time">
             </label>
+            <label class="repeat-field" id="taskLeadWrap" for="taskLead" hidden>
+              <span>Заранее</span>
+              <select class="task-select" id="taskLead" name="lead">
+                <option value="">В срок</option>
+                <option value="10">За 10 минут</option>
+                <option value="60">За час</option>
+                <option value="1440">За день</option>
+              </select>
+            </label>
             <p class="repeat-hint" id="repeatHint">Повторяющиеся дела видны во всех подходящих днях.</p>
           </div>
         </form>
@@ -506,6 +515,14 @@
               <option value="on">Всегда включена</option>
               <option value="off">Выключена</option>
             </select>
+          </div>
+          <div id="digestRow" hidden>
+            <label class="toggle-row">
+              <input type="checkbox" id="digestToggle">
+              <span class="toggle-mark" aria-hidden="true"></span>
+              <span>Утренняя сводка в 08:00</span>
+            </label>
+            <p class="settings-note">Одно уведомление со списком дел на день. Работает в APK; по умолчанию выключено.</p>
           </div>
           <p class="settings-note">Мобильный профиль отключает размытие подложки и тяжёлые тени, поэтому меню открываются плавнее. «Авто» выбирает его сам на Android.</p>
         </section>

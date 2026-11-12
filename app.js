@@ -24,9 +24,12 @@
     decor: true,
     sky: "auto",
     holiday: "auto",
-    weekStart: 1
+    weekStart: 1,
+    morningDigest: false
   };
   const REPEATS = ["none", "daily", "weekdays", "weekly", "monthly", "yearly"];
+  // За сколько напоминать: варианты селекта и допустимые значения схемы.
+  const LEAD_OPTIONS = [10, 60, 1440];
   const MAX_SEARCH_RESULTS = 100;
   const MONTHS_NOMINATIVE = [
     "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
@@ -104,6 +107,8 @@
     taskRepeatEnd: document.getElementById("taskRepeatEnd"),
     taskTime: document.getElementById("taskTime"),
     taskTimeWrap: document.getElementById("taskTimeWrap"),
+    taskLead: document.getElementById("taskLead"),
+    taskLeadWrap: document.getElementById("taskLeadWrap"),
     repeatEndWrap: document.getElementById("repeatEndWrap"),
     repeatHint: document.getElementById("repeatHint"),
     formError: document.getElementById("formError"),
@@ -125,6 +130,8 @@
     weekStartSelect: document.getElementById("weekStartSelect"),
     skySelect: document.getElementById("skySelect"),
     holidaySelect: document.getElementById("holidaySelect"),
+    digestRow: document.getElementById("digestRow"),
+    digestToggle: document.getElementById("digestToggle"),
     snow: document.querySelector(".snow"),
     decorToggle: document.getElementById("decorToggle"),
     settingsBuild: document.getElementById("settingsBuild"),
@@ -213,6 +220,11 @@
 
   function normalizeTimeValue(value) {
     return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || "")) ? String(value) : null;
+  }
+
+  function normalizeLeadValue(value) {
+    const number = Number(value);
+    return LEAD_OPTIONS.includes(number) ? number : null;
   }
 
   // Абсолютная метка напоминания: дата задачи + время. Нужна для сортировки
@@ -362,7 +374,8 @@
               deletedAt: Number(task.deletedAt) || null,
               time: typeof task.time === "string" ? task.time : null,
               remindAt: Number(task.remindAt) || null,
-              snoozedUntil: Number(task.snoozedUntil) || null
+              snoozedUntil: Number(task.snoozedUntil) || null,
+              leadMinutes: normalizeLeadValue(task.leadMinutes)
             };
           });
         if (clean.length) tasks[iso] = clean;
@@ -401,6 +414,7 @@
           start,
           end,
           time: normalizeTimeValue(raw.time),
+          leadMinutes: normalizeLeadValue(raw.leadMinutes),
           createdAt,
           updatedAt,
           deletedAt: Number(raw.deletedAt) || null,
@@ -427,6 +441,7 @@
         sky: SKY_MODES.includes(rawSettings.sky) ? rawSettings.sky : DEFAULT_SETTINGS.sky,
         holiday: HOLIDAY_MODES.includes(rawSettings.holiday) ? rawSettings.holiday : DEFAULT_SETTINGS.holiday,
         weekStart: rawSettings.weekStart === 0 ? 0 : 1,
+        morningDigest: rawSettings.morningDigest === true,
         updatedAt: Number(rawSettings.updatedAt) || 0
       }
     };
@@ -452,7 +467,7 @@
         settingsFingerprint = fingerprint;
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        version: 3,
+        version: 4,
         view: state.view,
         tasks: state.tasks,
         series: state.series,
@@ -463,7 +478,7 @@
         window.PixelSync.scheduleSync(2000);
       }
       if (window.PixelNotify) {
-        window.PixelNotify.schedule(state.tasks, state.series, 900);
+        window.PixelNotify.schedule(state.tasks, state.series, 900, state.settings);
       }
       return true;
     } catch (error) {
@@ -1207,6 +1222,7 @@
     els.taskRepeat.value = "none";
     els.taskRepeatEnd.value = "";
     els.taskTime.value = "";
+    els.taskLead.value = "";
     updateRepeatFields();
     showDialog(els.dialog);
   }
@@ -1396,7 +1412,10 @@
 
   function updateRepeatFields() {
     const active = els.taskRepeat.value !== "none";
+    const hasTime = Boolean(normalizeTimeValue(els.taskTime.value));
     els.repeatEndWrap.hidden = !active;
+    els.taskLeadWrap.hidden = !hasTime;
+    if (!hasTime) els.taskLead.value = "";
     if (active) {
       els.taskRepeatEnd.min = state.dialogDate || "";
       els.repeatHint.textContent = "Серия появится во всех подходящих днях, а время включит напоминание в каждый такой день. Отметки и удаления хранятся отдельно для каждого дня.";
@@ -1417,6 +1436,7 @@
 
     const repeat = REPEATS.includes(els.taskRepeat.value) ? els.taskRepeat.value : "none";
     const time = normalizeTimeValue(els.taskTime.value);
+    const leadMinutes = time ? normalizeLeadValue(els.taskLead.value) : null;
     if (repeat !== "none") {
       const end = els.taskRepeatEnd.value;
       if (end && (!isValidISO(end) || end < state.dialogDate)) {
@@ -1431,6 +1451,7 @@
         start: state.dialogDate,
         end: end || null,
         time,
+        leadMinutes,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         deletedAt: null,
@@ -1446,6 +1467,7 @@
         updatedAt: Date.now(),
         deletedAt: null,
         time,
+        leadMinutes,
         remindAt: remindTimestamp(state.dialogDate, time)
       };
       if (!state.tasks[state.dialogDate]) state.tasks[state.dialogDate] = [];
@@ -1458,6 +1480,7 @@
     els.taskRepeat.value = "none";
     els.taskRepeatEnd.value = "";
     els.taskTime.value = "";
+    els.taskLead.value = "";
     updateRepeatFields();
     els.formError.textContent = "";
     renderTaskList();
@@ -1805,6 +1828,9 @@
     els.weekStartSelect.value = String(state.settings.weekStart);
     els.skySelect.value = state.settings.sky;
     els.holidaySelect.value = state.settings.holiday;
+    els.digestToggle.checked = state.settings.morningDigest;
+    // В браузере системных уведомлений нет — не обещаем сводку.
+    els.digestRow.hidden = !isNativeApp();
   }
 
   function openSettings() {
@@ -2376,9 +2402,9 @@
   function setupNotifications() {
     if (!window.PixelNotify) return;
     window.PixelNotify.addActionListener(handleNotificationAction);
-    window.PixelNotify.schedule(state.tasks, state.series, 1500);
+    window.PixelNotify.schedule(state.tasks, state.series, 1500, state.settings);
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) window.PixelNotify.schedule(state.tasks, state.series, 600);
+      if (!document.hidden) window.PixelNotify.schedule(state.tasks, state.series, 600, state.settings);
     });
   }
 
@@ -2505,6 +2531,7 @@
     });
 
     els.taskRepeat.addEventListener("change", updateRepeatFields);
+    els.taskTime.addEventListener("input", updateRepeatFields);
     els.taskRepeatEnd.addEventListener("input", () => {
       if (els.formError.textContent) els.formError.textContent = "";
     });
@@ -2632,6 +2659,11 @@
         : "auto";
       saveStore();
       applyHoliday();
+    });
+
+    els.digestToggle.addEventListener("change", () => {
+      state.settings.morningDigest = els.digestToggle.checked;
+      saveStore();
     });
 
     els.exportJsonBtn.addEventListener("click", exportJson);

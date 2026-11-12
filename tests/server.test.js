@@ -57,7 +57,7 @@ function makeTask(overrides) {
 
 function body(tasks, series, settings) {
   return {
-    version: 3,
+    version: 4,
     view: "month",
     tasks: tasks || {},
     series: series || [],
@@ -71,6 +71,7 @@ function body(tasks, series, settings) {
       sky: "auto",
       holiday: "auto",
       weekStart: 1,
+      morningDigest: false,
       updatedAt: 0,
       ...(settings || {})
     }

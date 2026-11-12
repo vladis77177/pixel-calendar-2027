@@ -18,7 +18,7 @@ function task(overrides) {
 
 function state(tasks, series, settings) {
   return {
-    version: 3,
+    version: 4,
     view: "month",
     tasks: tasks || {},
     series: series || [],
@@ -32,6 +32,7 @@ function state(tasks, series, settings) {
       sky: "auto",
       holiday: "auto",
       weekStart: 1,
+      morningDigest: false,
       updatedAt: 0,
       ...(settings || {})
     }
@@ -62,7 +63,7 @@ test("миграция v2: метки времени, могилы и новые
     settings: { showHolidays: false }
   });
 
-  assert.equal(migrated.version, 3);
+  assert.equal(migrated.version, 4);
   assert.equal(migrated.view, "week");
   assert.deepEqual(Object.keys(migrated.tasks), ["2026-11-10"]);
 
@@ -186,7 +187,7 @@ test("слияние идемпотентно и не зависит от пор
 
 test("пустые настройки сервера не обнуляют интерфейс", () => {
   const local = state({}, [], { updatedAt: 0 });
-  const remote = { version: 3, view: "month", tasks: {}, series: [], settings: { updatedAt: 0 } };
+  const remote = { version: 4, view: "month", tasks: {}, series: [], settings: { updatedAt: 0 } };
   const merged = mergeStates(local, remote);
   assert.equal(merged.settings.profile, "auto");
   assert.equal(merged.settings.weekStart, 1);
@@ -201,5 +202,50 @@ test("пустые состояния не ломают слияние", () => {
   const empty = mergeStates(null, null);
   assert.deepEqual(empty.tasks, {});
   assert.deepEqual(empty.series, []);
-  assert.equal(empty.version, 3);
+  assert.equal(empty.version, 4);
+});
+
+test("миграция v3→v4 сохраняет «заранее» и чистит лишние значения", () => {
+  const migrated = migrateState({
+    version: 3,
+    tasks: {
+      "2026-11-10": [
+        task({ id: "t1", leadMinutes: 60 }),
+        task({ id: "t2", leadMinutes: 30 }),
+        task({ id: "t3" })
+      ]
+    },
+    series: [{
+      id: "s1",
+      text: "Серия",
+      freq: "daily",
+      start: "2026-11-10",
+      time: "09:00",
+      leadMinutes: 1440,
+      createdAt: 1,
+      updatedAt: 1,
+      exceptions: {}
+    }],
+    settings: { morningDigest: true }
+  });
+
+  const tasks = migrated.tasks["2026-11-10"];
+  assert.equal(tasks[0].leadMinutes, 60);
+  assert.equal(tasks[1].leadMinutes, null);
+  assert.equal(tasks[2].leadMinutes, null);
+  assert.equal(migrated.series[0].leadMinutes, 1440);
+  assert.equal(migrated.settings.morningDigest, true);
+  assert.equal(migrateState({ tasks: {} }).settings.morningDigest, false);
+});
+
+test("слияние переносит «заранее» вместе с более новой задачей", () => {
+  const local = state({
+    "2026-11-10": [task({ id: "t1", updatedAt: 100, leadMinutes: 10 })]
+  }, [], { updatedAt: 10 });
+  const remote = state({
+    "2026-11-10": [task({ id: "t1", updatedAt: 200, leadMinutes: 60 })]
+  }, [], { updatedAt: 10 });
+
+  const merged = mergeStates(local, remote);
+  assert.equal(merged.tasks["2026-11-10"][0].leadMinutes, 60);
 });
