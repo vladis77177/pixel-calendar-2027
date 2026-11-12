@@ -1075,6 +1075,7 @@
     if (state.view !== "month" || !window.matchMedia("(min-width: 761px)").matches) {
       root.style.removeProperty("--month-row");
       delete root.dataset.monthFit;
+      delete root.dataset.monthTight;
       return;
     }
 
@@ -1082,16 +1083,50 @@
     if (!grid) return;
 
     const rows = Math.max(1, Math.round(grid.children.length / 7));
+    const shell = document.querySelector(".page-shell");
     // Координата от начала документа: прокрутка не должна влиять на высоту строк.
-    const top = grid.getBoundingClientRect().top + window.scrollY;
-    const available = window.innerHeight - top - 10;
-    let gap = 6;
-    let raw = Math.floor((available - gap * (rows - 1)) / rows);
-    if (raw < 88) {
-      gap = 4;
-      raw = Math.floor((available - gap * (rows - 1)) / rows);
+    const gridTop = grid.getBoundingClientRect().top + window.scrollY;
+
+    // Сколько места занимает всё, что ниже сетки (подвалы и отступы).
+    // Величина не зависит от высоты самой сетки, поэтому её можно мерить прямо.
+    const reserveBelow = () => Math.round(
+      shell.getBoundingClientRect().bottom - grid.getBoundingClientRect().bottom,
+    );
+
+    const rowsFor = (space) => {
+      let gap = 6;
+      let raw = Math.floor((space - gap * (rows - 1)) / rows);
+      if (raw < 88) {
+        gap = 4;
+        raw = Math.floor((space - gap * (rows - 1)) / rows);
+      }
+      return raw;
+    };
+
+    const spaceFor = (reserve) => window.innerHeight - gridTop - reserve - 8;
+
+    // Пара проходов: после смены высоты строк низ страницы смещается,
+    // поэтому запас меряем заново и уточняем результат.
+    const solve = () => {
+      let rowHeight = 0;
+      for (let pass = 0; pass < 3; pass += 1) {
+        const next = Math.max(44, Math.min(130, rowsFor(spaceFor(reserveBelow()))));
+        if (next === rowHeight) break;
+        rowHeight = next;
+        root.style.setProperty("--month-row", `${rowHeight}px`);
+        void grid.offsetHeight;
+      }
+      return rowHeight;
+    };
+
+    // Сначала пробуем с подвалом страницы; если строки уже теряют подписи дел,
+    // убираем декоративный подвал и считаем заново — он отдаёт сетке около 50px.
+    delete root.dataset.monthTight;
+    let rowHeight = solve();
+    if (rowHeight < 62) {
+      root.dataset.monthTight = "on";
+      rowHeight = solve();
     }
-    const rowHeight = Math.max(48, Math.min(130, raw));
 
     root.style.setProperty("--month-row", `${rowHeight}px`);
     root.dataset.monthFit = rowHeight < 62 ? "tight" : (rowHeight < 88 ? "compact" : "full");

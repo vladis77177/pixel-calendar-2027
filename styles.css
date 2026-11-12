@@ -1217,7 +1217,7 @@ html[data-holiday="on"] .island-grass {
   height: 100%;
   background:
     repeating-linear-gradient(90deg, #6fc54e 0 6px, #62b744 6px 12px);
-  transition: width 0.25s steps(5, end);
+  transition: width 0.34s cubic-bezier(0.22, 0.9, 0.3, 1);
 }
 
 .progress-note {
@@ -1304,6 +1304,13 @@ html[data-holiday="on"] .island-grass {
 
   html[data-month-fit="compact"] .day-holiday,
   html[data-month-fit="tight"] .day-holiday {
+    display: none;
+  }
+
+  /* Подвал страницы декоративный: прячем его, когда он отнимает у сетки
+     высоту и вместо него месяц мог бы показать подписи дел.
+     Атрибут ставит fitMonthView() в app.js. */
+  html[data-month-tight] .page-footer {
     display: none;
   }
 }
@@ -2176,7 +2183,7 @@ html[data-profile="full"] .day-dialog::backdrop {
   width: 0;
   height: 100%;
   background: repeating-linear-gradient(90deg, #6fc54e 0 6px, #62b744 6px 12px);
-  transition: width 0.2s steps(5, end);
+  transition: width 0.3s cubic-bezier(0.22, 0.9, 0.3, 1);
 }
 
 .task-list {

@@ -395,7 +395,7 @@ input:focus-visible {
   width: 0;
   height: 100%;
   background: repeating-linear-gradient(90deg, #6fc54e 0 6px, #62b744 6px 12px);
-  transition: width 0.25s steps(5, end);
+  transition: width 0.34s cubic-bezier(0.22, 0.9, 0.3, 1);
 }
 
 .widget-tasks {
