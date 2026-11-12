@@ -20,8 +20,23 @@
     holiday: "auto",
     weekStart: 1,
     morningDigest: false,
+    templates: [],
     updatedAt: 0
   };
+
+  function normalizeTemplates(raw) {
+    if (!Array.isArray(raw)) return [];
+    const seen = new Set();
+    const list = [];
+    raw.forEach((value) => {
+      if (typeof value !== "string") return;
+      const text = value.trim().replace(/\s+/g, " ").slice(0, 60);
+      if (!text || seen.has(text)) return;
+      seen.add(text);
+      list.push(text);
+    });
+    return list.slice(0, 12);
+  }
 
   // Настройки синхронизируются блоком: недостающие поля заполняем
   // значениями по умолчанию, иначе пустой сервер обнулит интерфейс.
@@ -31,6 +46,7 @@
       ...DEFAULT_SETTINGS,
       ...source,
       morningDigest: source.morningDigest === true,
+      templates: normalizeTemplates(source.templates),
       updatedAt: timeMs(source.updatedAt)
     };
   }

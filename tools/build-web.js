@@ -13,6 +13,7 @@ const FILES = [
   "app.js",
   "update.js",
   "sync.js",
+  "series-stats.js",
   "notifications.js",
   "widget.html",
   "widget.css",

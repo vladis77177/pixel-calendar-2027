@@ -25,9 +25,21 @@
     sky: "auto",
     holiday: "auto",
     weekStart: 1,
-    morningDigest: false
+    morningDigest: false,
+    templates: []
   };
   const REPEATS = ["none", "daily", "weekdays", "weekly", "monthly", "yearly"];
+  // Быстрые дела: сколько строк храним и какой длины.
+  const MAX_TEMPLATES = 12;
+  const TEMPLATE_MAX_LENGTH = 60;
+  // Подписи клеток истории серии (подсказка при наведении).
+  const HEAT_STATE_LABELS = {
+    done: "сделано",
+    missed: "пропущено",
+    pending: "ещё не отмечено",
+    skipped: "день перенесён",
+    none: "по расписанию дня нет"
+  };
   // За сколько напоминать: варианты селекта и допустимые значения схемы.
   const LEAD_OPTIONS = [10, 60, 1440];
   const MAX_SEARCH_RESULTS = 100;
@@ -111,6 +123,8 @@
     taskLeadWrap: document.getElementById("taskLeadWrap"),
     repeatEndWrap: document.getElementById("repeatEndWrap"),
     repeatHint: document.getElementById("repeatHint"),
+    quickTimes: document.getElementById("quickTimes"),
+    templateChips: document.getElementById("templateChips"),
     formError: document.getElementById("formError"),
     searchDialog: document.getElementById("searchDialog"),
     searchCloseBtn: document.getElementById("searchCloseBtn"),
@@ -146,6 +160,8 @@
     installBtn: document.getElementById("installBtn"),
     installNote: document.getElementById("installNote"),
     settingsMeta: document.getElementById("settingsMeta"),
+    seriesStats: document.getElementById("seriesStats"),
+    templatesInput: document.getElementById("templatesInput"),
     saveNoteText: document.getElementById("saveNoteText"),
     syncUrl: document.getElementById("syncUrl"),
     syncToken: document.getElementById("syncToken"),
@@ -442,6 +458,7 @@
         holiday: HOLIDAY_MODES.includes(rawSettings.holiday) ? rawSettings.holiday : DEFAULT_SETTINGS.holiday,
         weekStart: rawSettings.weekStart === 0 ? 0 : 1,
         morningDigest: rawSettings.morningDigest === true,
+        templates: normalizeTemplates(rawSettings.templates),
         updatedAt: Number(rawSettings.updatedAt) || 0
       }
     };
@@ -557,6 +574,27 @@
       return date.getMonth() === start.getMonth() && date.getDate() === start.getDate();
     }
     return false;
+  }
+
+  function seriesStatsFor(series) {
+    const helpers = window.PixelSeriesStats;
+    if (!helpers || !series) return null;
+    return helpers.summarize(series, toISO(new Date()), isSeriesActiveOn);
+  }
+
+  // Быстрые дела: строки из настроек, очищенные от пустых и повторов.
+  function normalizeTemplates(raw) {
+    if (!Array.isArray(raw)) return [];
+    const seen = new Set();
+    const list = [];
+    raw.forEach((value) => {
+      if (typeof value !== "string") return;
+      const text = value.trim().replace(/\s+/g, " ").slice(0, TEMPLATE_MAX_LENGTH);
+      if (!text || seen.has(text)) return;
+      seen.add(text);
+      list.push(text);
+    });
+    return list.slice(0, MAX_TEMPLATES);
   }
 
   function getEntries(iso) {
@@ -1259,6 +1297,7 @@
     els.taskTime.value = "";
     els.taskLead.value = "";
     updateRepeatFields();
+    renderTemplateChips();
     showDialog(els.dialog);
   }
 
@@ -1296,6 +1335,20 @@
     els.dayProgressBar.style.width = `${percent}%`;
     els.taskList.setAttribute("aria-label", `Задачи на ${formatLongDate(date)}`);
     renderTaskList();
+  }
+
+  // Быстрые дела в окне дня: одно нажатие — дело уже в сундуке.
+  function renderTemplateChips() {
+    if (!els.templateChips) return;
+    const templates = state.settings.templates;
+    els.templateChips.replaceChildren();
+    els.templateChips.hidden = !templates.length;
+    templates.forEach((text) => {
+      const button = el("button", "chip-btn template-chip", text);
+      button.type = "button";
+      button.dataset.template = text;
+      els.templateChips.appendChild(button);
+    });
   }
 
   function renderTaskList() {
@@ -1349,7 +1402,11 @@
           timeInput.setAttribute("aria-label", "Время напоминания");
           form.append(input, dateInput, timeInput);
         } else {
-          const note = el("span", "series-edit-note", "Изменится вся серия");
+          const streak = seriesStatsFor(entry.series);
+          const noteText = streak && streak.current > 0
+            ? `Изменится вся серия · подряд ${streak.current}`
+            : "Изменится вся серия";
+          const note = el("span", "series-edit-note", noteText);
           note.title = seriesSchedule(entry.series);
           const timeInput = el("input", "task-edit-time");
           timeInput.type = "time";
@@ -1853,6 +1910,60 @@
     });
   }
 
+  // История серии: последние 10 недель клетками. Читается как одна картинка.
+  function renderSeriesStats() {
+    if (!els.seriesStats) return;
+    const helpers = window.PixelSeriesStats;
+    const series = state.series.filter((item) => !item.deletedAt);
+    els.seriesStats.replaceChildren();
+
+    if (!helpers) return;
+    if (!series.length) {
+      els.seriesStats.appendChild(el("p", "settings-note", "Повторяющихся дел пока нет."));
+      return;
+    }
+
+    const todayIso = toISO(new Date());
+    series.forEach((item) => {
+      const stats = seriesStatsFor(item);
+      if (!stats) return;
+      const card = el("article", "series-card");
+
+      const head = el("p", "series-card-head");
+      head.appendChild(el("strong", "series-card-title", item.text));
+      head.appendChild(el("span", "series-card-freq", seriesSchedule(item)));
+      card.appendChild(head);
+
+      const nums = el("p", "series-card-nums");
+      nums.append(
+        "Подряд ",
+        el("b", null, String(stats.current)),
+        " · лучший ",
+        el("b", null, String(stats.best)),
+        " · всего ",
+        el("b", null, String(stats.done)),
+        ` из ${stats.total}`
+      );
+      card.appendChild(nums);
+
+      const cells = helpers.history(item, todayIso, isSeriesActiveOn, helpers.MAX_HISTORY_DAYS);
+      const heat = el("div", "heat");
+      heat.setAttribute("role", "img");
+      heat.setAttribute(
+        "aria-label",
+        `История серии «${item.text}»: отмечено ${stats.done} из ${stats.total}`
+      );
+      cells.forEach((cell) => {
+        const dot = el("span", "heat-cell");
+        dot.dataset.state = cell.state;
+        dot.title = `${formatLongDate(fromISO(cell.iso))} — ${HEAT_STATE_LABELS[cell.state] || ""}`;
+        heat.appendChild(dot);
+      });
+      card.appendChild(heat);
+      els.seriesStats.appendChild(card);
+    });
+  }
+
   function syncSettingsControls() {
     els.holidaysToggle.checked = state.settings.showHolidays;
     els.profileSelect.value = state.settings.profile;
@@ -1866,12 +1977,14 @@
     els.digestToggle.checked = state.settings.morningDigest;
     // В браузере системных уведомлений нет — не обещаем сводку.
     els.digestRow.hidden = !isNativeApp();
+    if (els.templatesInput) els.templatesInput.value = state.settings.templates.join("\n");
   }
 
   function openSettings() {
     syncSettingsControls();
     updateSettingsMeta();
     refreshSyncFields();
+    renderSeriesStats();
     if (!/^https?:$/.test(window.location.protocol)) {
       els.installNote.textContent = "Установка PWA доступна при открытии сайта через http:// или https://. Сейчас страница открыта как файл.";
     } else if (els.installBtn.hidden) {
@@ -2567,6 +2680,39 @@
 
     els.taskRepeat.addEventListener("change", updateRepeatFields);
     els.taskTime.addEventListener("input", updateRepeatFields);
+
+    if (els.quickTimes) {
+      els.quickTimes.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-quick-time]");
+        if (!button) return;
+        els.taskTime.value = button.dataset.quickTime;
+        updateRepeatFields();
+      });
+    }
+
+    if (els.templateChips) {
+      els.templateChips.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-template]");
+        if (!button || !state.dialogDate) return;
+        els.taskInput.value = button.dataset.template;
+        // Тот же путь, что и у кнопки «Добавить»: повтор и время берутся из формы.
+        els.taskForm.requestSubmit();
+      });
+    }
+
+    if (els.templatesInput) {
+      const storeTemplates = () => {
+        state.settings.templates = normalizeTemplates(els.templatesInput.value.split("\n"));
+        saveStore();
+        renderTemplateChips();
+      };
+      els.templatesInput.addEventListener("input", storeTemplates);
+      // Приводим текст к тому, что реально сохранилось: лишние строки отброшены.
+      els.templatesInput.addEventListener("blur", () => {
+        storeTemplates();
+        els.templatesInput.value = state.settings.templates.join("\n");
+      });
+    }
     els.taskRepeatEnd.addEventListener("input", () => {
       if (els.formError.textContent) els.formError.textContent = "";
     });

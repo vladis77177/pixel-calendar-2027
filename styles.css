@@ -3437,6 +3437,145 @@ body.has-update-bar .toast {
   display: none;
 }
 
+/* Быстрое время: три кнопки рядом с полем времени. */
+.quick-times {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding-bottom: 2px;
+}
+
+.chip-btn {
+  min-height: 30px;
+  padding: 3px 9px;
+  background: #fffdf7;
+  border: 2px solid #b99d6b;
+  box-shadow: 0 3px 0 var(--line);
+  color: var(--ink-soft);
+  font-family: var(--font-num);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.chip-btn:hover {
+  background: var(--paper);
+}
+
+.chip-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--line);
+}
+
+.chip-btn:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+/* Быстрые дела над формой добавления. */
+.template-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 0 10px;
+}
+
+.template-chips[hidden] {
+  display: none;
+}
+
+.template-chip {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-body);
+  font-weight: 700;
+}
+
+/* Статистика серий: счёт и история клетками. */
+.series-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.series-card {
+  padding: 9px 10px;
+  background: #fffdf7;
+  border: 2px solid #b99d6b;
+  box-shadow: 0 3px 0 var(--line);
+}
+
+.series-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0 0 3px;
+}
+
+.series-card-title {
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.series-card-freq {
+  color: var(--ink-soft);
+  font-family: var(--font-pixel);
+  font-size: 11px;
+}
+
+.series-card-nums {
+  margin: 0 0 7px;
+  color: var(--ink-soft);
+  font-family: var(--font-num);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.heat {
+  display: grid;
+  grid-template-rows: repeat(7, 9px);
+  grid-auto-flow: column;
+  grid-auto-columns: 9px;
+  gap: 2px;
+  justify-content: start;
+}
+
+.heat-cell {
+  width: 9px;
+  height: 9px;
+  background: var(--paper-shadow);
+  border: 1px solid rgba(52, 36, 22, 0.08);
+}
+
+.heat-cell[data-state="done"] {
+  background: var(--green);
+}
+
+.heat-cell[data-state="missed"] {
+  background: var(--gold);
+}
+
+.heat-cell[data-state="pending"] {
+  background: #fffdf7;
+  border-color: #b99d6b;
+}
+
+.heat-cell[data-state="skipped"] {
+  background: var(--paper-deep);
+}
+
+.heat-cell[data-state="none"] {
+  background: transparent;
+  border-color: transparent;
+}
+
 .task-select,
 .task-date,
 .task-time {

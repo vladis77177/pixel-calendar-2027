@@ -33,6 +33,7 @@ function state(tasks, series, settings) {
       holiday: "auto",
       weekStart: 1,
       morningDigest: false,
+      templates: [],
       updatedAt: 0,
       ...(settings || {})
     }
@@ -236,6 +237,29 @@ test("миграция v3→v4 сохраняет «заранее» и чист
   assert.equal(migrated.series[0].leadMinutes, 1440);
   assert.equal(migrated.settings.morningDigest, true);
   assert.equal(migrateState({ tasks: {} }).settings.morningDigest, false);
+});
+
+test("миграция: быстрые дела очищаются от пустых строк, повторов и лишней длины", () => {
+  const migrated = migrateState({
+    version: 4,
+    tasks: {},
+    settings: {
+      templates: [" Полить  цветы ", "", "Полить цветы", "   ", 42, "x".repeat(80)].concat(
+        Array.from({ length: 20 }, (unused, index) => `Дело ${index}`)
+      )
+    }
+  });
+  const list = migrated.settings.templates;
+  assert.equal(list[0], "Полить цветы");
+  assert.equal(list[1], "x".repeat(60), "длинная строка обрезается");
+  assert.equal(list.length, 12, "список ограничен двенадцатью делами");
+  assert.equal(new Set(list).size, list.length, "повторов нет");
+});
+
+test("миграция: мусор вместо списка дел превращается в пустой список", () => {
+  ["строка", 7, null, { a: 1 }].forEach((value) => {
+    assert.deepEqual(migrateState({ settings: { templates: value } }).settings.templates, []);
+  });
 });
 
 test("слияние переносит «заранее» вместе с более новой задачей", () => {

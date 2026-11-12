@@ -346,6 +346,8 @@
 
         <ul class="task-list" id="taskList" aria-label="Задачи на день"></ul>
 
+        <div class="template-chips" id="templateChips" role="group" aria-label="Быстрые дела" hidden></div>
+
         <form class="add-form" id="taskForm" novalidate>
           <div class="add-row">
             <label class="sr-only" for="taskInput">Новая задача</label>
@@ -375,6 +377,11 @@
               <span>Время</span>
               <input class="task-time" id="taskTime" name="time" type="time">
             </label>
+            <div class="quick-times" id="quickTimes" role="group" aria-label="Быстрое время">
+              <button class="chip-btn" type="button" data-quick-time="09:00">09:00</button>
+              <button class="chip-btn" type="button" data-quick-time="12:00">12:00</button>
+              <button class="chip-btn" type="button" data-quick-time="18:00">18:00</button>
+            </div>
             <label class="repeat-field" id="taskLeadWrap" for="taskLead" hidden>
               <span>Заранее</span>
               <select class="task-select" id="taskLead" name="lead">
@@ -577,7 +584,22 @@
 
         <section class="settings-section">
           <h4 class="settings-title">Напоминания</h4>
-          <p class="settings-note">Укажите время у задачи — в APK придёт системное уведомление в этот день. В браузере системных напоминаний нет: они работают только в установленном приложении. Для дел с повтором время пока недоступно.</p>
+          <p class="settings-note">Укажите время у задачи — в APK придёт системное уведомление в этот день. В браузере системных напоминаний нет: они работают только в установленном приложении. У повторяющихся дел время задаётся так же: напоминание придёт в каждый подходящий день.</p>
+        </section>
+
+        <section class="settings-section">
+          <h4 class="settings-title">Серии: подряд и история</h4>
+          <p class="settings-note">Сколько раз подряд вы отмечали повторяющиеся дела. Клетка — день серии: залитая — сделано, светлая — пропущено, пустая — по расписанию дня не было.</p>
+          <div class="series-stats" id="seriesStats"></div>
+        </section>
+
+        <section class="settings-section">
+          <h4 class="settings-title">Быстрые дела</h4>
+          <p class="settings-note">По одному делу в строке. В окне дня такие дела добавляются одним нажатием — с текущими повтором и временем.</p>
+          <div class="settings-field settings-field-stack">
+            <label for="templatesInput">Список дел</label>
+            <textarea id="templatesInput" rows="4" spellcheck="false" placeholder="Полить цветы&#10;Позвонить маме&#10;Размяться"></textarea>
+          </div>
         </section>
 
         <section class="settings-section">
@@ -681,6 +703,7 @@
 
   <script src="update.js" defer></script>
   <script src="sync.js" defer></script>
+  <script src="series-stats.js" defer></script>
   <script src="notifications.js" defer></script>
   <script src="app.js" defer></script>
 </body>
