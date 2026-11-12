@@ -6,9 +6,9 @@
   "scripts": {
     "build:web": "node tools/build-web.js",
     "check": "node tools/check-js.js",
-    "verify": "node tools/check-js.js && node --test tests/ && node tools/build-web.js",
+    "verify": "node tools/check-js.js && node --test \"tests/**/*.test.js\" && node tools/build-web.js",
     "sync": "node sync-server/server.js",
-    "test": "node --test tests/",
+    "test": "node --test \"tests/**/*.test.js\"",
     "android:add": "npm run build:web && cap add android",
     "android:sync": "npm run build:web && cap sync android",
     "android:patch": "node tools/patch-android.js"
