@@ -15,7 +15,6 @@ html[data-daytime="night"] {
 
 html[data-daytime="night"] body {
   background:
-    radial-gradient(circle at 76% 12%, rgba(255, 244, 190, 0.12) 0 52px, transparent 53px),
     linear-gradient(180deg, #0b1020 0%, #141d36 55%, #202a44 100%);
 }
 
@@ -27,16 +26,21 @@ html[data-daytime="night"] .widget-cloud {
   display: none;
 }
 
+/* Луна рисуется честным полумесяцем: ступенчатый многоугольник (как пиксельные
+   формы в основном приложении) и стоит там, откуда убрано свечение — 76% × 12%.
+   Ширина 34px: при 390px центр на 296px, при 1280px — на 973px, от края не режется. */
 html[data-daytime="night"] .widget-moon {
   position: absolute;
-  top: 26px;
-  right: 28px;
+  top: 12%;
+  left: 76%;
   width: 34px;
   height: 34px;
+  translate: -50% -50%;
   background: #ffe9a8;
-  box-shadow:
-    inset -8px 0 0 #202a44,
-    inset 0 -8px 0 #f4d77e;
+  clip-path: polygon(
+    12px 2px, 8px 2px, 2px 8px, 0 16px, 2px 24px, 8px 30px, 16px 32px, 26px 30px, 32px 22px,
+    27px 23px, 19px 21px, 13px 15px, 11px 7px
+  );
 }
 
 html[data-daytime="night"] .widget-sky::before {
@@ -108,12 +112,30 @@ html[data-daytime="night"] .widget-footer {
   color: #8e9ab5;
 }
 
+/* Ссылка в подвале виджета задана своим зелёным и на тёмной подложке давала
+   1.8:1 — ночью берём светлую зелень (7.7:1). */
+html[data-daytime="night"] .widget-footer a {
+  color: #9fd28a;
+}
+
+/* Ночная плашка пустого дня: днём это светлое стекло на кремовой бумаге,
+   ночью под ней тёмная бумага, и полупрозрачный крем давал серое пятно,
+   а оба текста оставались тёмно-коричневыми и не читались. */
 html[data-daytime="night"] .widget-empty {
   border-color: #43506e;
+  background: rgba(11, 16, 32, 0.45);
   color: #c9bfa8;
 }
 
 /* Явные цвета: часть текста в widget.css задана hex-ами, а не переменными. */
+html[data-daytime="night"] .widget-empty-title {
+  color: #f2e8d5;
+}
+
+html[data-daytime="night"] .widget-empty-note {
+  color: #c2cbe0;
+}
+
 html[data-daytime="night"] .widget-eyebrow {
   color: #9fd28a;
 }

@@ -1,6 +1,6 @@
 {
   "name": "pixel-calendar-2027",
-  "version": "0.12.1",
+  "version": "0.12.2",
   "private": true,
   "description": "Пиксельный календарь 2027: веб-версия и Android-приложение на Capacitor.",
   "scripts": {

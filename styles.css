@@ -343,6 +343,12 @@ html[data-daytime="night"] .stars {
 
 html[data-daytime="night"] .moon {
   opacity: 1;
+  /* Мягкая внутренняя тень на 46px не читалась, и луна выходила светлым
+     квадратом. Тот же ступенчатый полумесяц, что у виджета (D4). */
+  clip-path: polygon(
+    16px 3px, 11px 3px, 3px 11px, 0 22px, 3px 33px, 11px 41px, 22px 43px, 35px 41px,
+    43px 30px, 37px 31px, 26px 28px, 18px 20px, 15px 10px
+  );
 }
 
 /* Пейзаж и облака темнеют вместе с небом. */
@@ -475,6 +481,181 @@ html[data-daytime="night"] .today-chip::after {
   background: #a3947c;
   mix-blend-mode: multiply;
   pointer-events: none;
+}
+
+/* Подложка выше гасит бумагу сильнее, чем текст (#fff8e7 → #a09070, а текст
+   #6b5432 → #443418), поэтому в панели ночью оставалось 3.0–3.8:1. Дожимаем
+   сам текст: он темнее подложки и под ней остаётся ≥4.5:1. Схему слоя не трогаем. */
+html[data-daytime="night"] .view-tab,
+html[data-daytime="night"] .period-kicker,
+html[data-daytime="night"] .weekday-name,
+html[data-daytime="night"] .day-number,
+html[data-daytime="night"] .task-count,
+html[data-daytime="night"] .progress-label,
+html[data-daytime="night"] .progress-value,
+html[data-daytime="night"] .progress-note,
+html[data-daytime="night"] .panel-footer,
+html[data-daytime="night"] .save-note,
+html[data-daytime="night"] .pixel-signature,
+html[data-daytime="night"] .mini-weekday,
+html[data-daytime="night"] .mini-year,
+html[data-daytime="night"] .calendar-tip {
+  color: #2a1c0b;
+}
+
+/* Полоса заголовка диалога ночью: под множительным слоем текст может только
+   темнеть, поэтому светлее делаем не текст, а саму полосу — тёмно-зелёная
+   полоса с кремовым текстом даёт ~6:1 (было 2.8:1). */
+html[data-daytime="night"] .dialog-head {
+  background: #16260a;
+  border-bottom-color: #38452a;
+  box-shadow: inset 0 3px 0 rgba(255, 248, 231, 0.08);
+  color: #fff8e7;
+}
+
+html[data-daytime="night"] .dialog-head h3,
+html[data-daytime="night"] .dialog-eyebrow {
+  color: #fff8e7;
+}
+
+/* Панель вкладок темнее бумаги, поэтому там текст ещё темнее. */
+html[data-daytime="night"] .view-tab {
+  color: #261b0b;
+}
+
+/* Погасшие дни соседних месяцев остаются бледнее, но уже не сереют. */
+html[data-daytime="night"] .day-cell.is-outside .day-number {
+  color: #463621;
+}
+
+html[data-daytime="night"] .brand-eyebrow,
+html[data-daytime="night"] .quick-add-label,
+html[data-daytime="night"] .quick-add-label strong,
+html[data-daytime="night"] .today-label,
+html[data-daytime="night"] .task-pill,
+html[data-daytime="night"] .today-pin {
+  color: #1f3a12;
+}
+
+html[data-daytime="night"] .task-pill.is-done {
+  color: #3a2f22;
+}
+
+html[data-daytime="night"] .task-pill.is-series {
+  color: #1e3a5c;
+}
+
+html[data-daytime="night"] .weekday-name.is-weekend,
+html[data-daytime="night"] .day-cell.is-holiday:not(.is-today) .day-number,
+html[data-daytime="night"] .day-holiday,
+html[data-daytime="night"] .mini-day.is-holiday,
+html[data-daytime="night"] .holiday-star {
+  color: #5a1c10;
+}
+
+/* Зелёные плашки: светлый текст под множительным слоем уходит в беж и теряет
+   контраст, поэтому ночью берём тёмную зелень и кремовый текст. */
+html[data-daytime="night"] .view-tab.is-active,
+html[data-daytime="night"] .mini-day.is-today {
+  background: #32481f;
+  color: #fff8e7;
+}
+
+/* Зелёные кнопки ночью остаются зелёными, как днём (решение пользователя).
+   Под слоем затемнения зелёная кнопка доходит до (110,114,37), где даже чёрный
+   текст даёт лишь 4.16:1 — то есть день-в-ночь цветом не подделать. Поэтому
+   поднимаем сами кнопки над слоем: лицо остаётся дневным #6ec44c, а тёмный
+   текст на нём даёт 8.2:1. */
+html[data-daytime="night"] .quick-add-btn,
+html[data-daytime="night"] .add-btn {
+  position: relative;
+  z-index: 21;
+}
+
+/* Обёртка быстрого ввода: дневной светло-зелёный #eaf8dc под слоем выцветал в
+   серо-оливковый (149,144,107) — берём насыщенную зелень, которая после слоя
+   остаётся зелёной (128,148,81), и тёмную фаску. */
+html[data-daytime="night"] .quick-add {
+  background: #c8ffa6;
+  box-shadow:
+    0 4px 0 rgba(58, 41, 27, 0.8),
+    inset 0 3px 0 #eaffe0,
+    inset 0 -3px 0 #7fae5f;
+}
+
+html[data-daytime="night"] .quick-add-input {
+  background: #fffdf7;
+  box-shadow: inset 0 3px 0 #e9dbbc;
+}
+
+html[data-daytime="night"] .quick-add-input::placeholder {
+  /* На тёмной бумаге светлая подсказка не читается: 5.0:1. */
+  color: #4e3b1e;
+}
+
+/* Тост стоит вне ночного слоя (position: fixed), поэтому показывал дневную
+   бумагу в полную яркость — самый светлый предмет на экране. */
+html[data-daytime="night"] .toast {
+  background: #2b3650;
+  border-color: #43506e;
+  box-shadow: 0 4px 0 #070b16;
+  color: #f2e8d5;
+}
+
+html[data-daytime="night"] .toast-cube {
+  box-shadow:
+    0 0 0 2px #43506e,
+    inset 0 2px 0 #b9f397;
+}
+
+/* Крестик закрытия: светлая плашка была вторым по яркости предметом после
+   полосы заголовка. Ночью — тёмная зелень со светлой рамкой (иконка 4.7:1). */
+html[data-daytime="night"] .dialog-close {
+  background: #2b3d1f;
+  border-color: #55684a;
+  box-shadow:
+    0 3px 0 #0b1207,
+    inset 0 2px 0 #465c39;
+  color: #f2e8d5;
+}
+
+html[data-daytime="night"] .dialog-close:hover {
+  background: #36502a;
+}
+
+/* Настройки ночью: карточка и секции почти сливались (после слоя #fbf0d5 даёт
+   160,139,103, а секция #fff8e7 — 163,146,118). Разводим по яркости, как днём,
+   где секция светлее карточки, и возвращаем секции видимую рамку. */
+html[data-daytime="night"] .dialog-card {
+  background-color: #e4d3a8;
+}
+
+html[data-daytime="night"] .settings-section {
+  background: #fff9ea;
+  border-color: #7a653d;
+  box-shadow: inset 0 2px 0 #fffef8;
+}
+
+/* Неделя ночью: явные ночные цвета получил только месячный вид, поэтому здесь
+   подписи выцветали — «Свободный день…» давал 3.1:1, названия дней 3.9–4.2:1. */
+html[data-daytime="night"] .week-day-name,
+html[data-daytime="night"] .week-month,
+html[data-daytime="night"] .week-empty,
+html[data-daytime="night"] .week-date {
+  color: #402f1a;
+}
+
+html[data-daytime="night"] .week-day.is-weekend .week-day-name {
+  color: #4a2018;
+}
+
+html[data-daytime="night"] .week-task,
+html[data-daytime="night"] .week-add {
+  color: #24421a;
+}
+
+html[data-daytime="night"] .week-task.is-done {
+  color: #4a3b26;
 }
 
 .winter-tree {
@@ -1041,10 +1222,15 @@ html[data-holiday="on"] .island-grass {
   padding: 8px 13px;
   background: #f4e2b7;
   border: 3px solid var(--line);
+  /* Фаски кнопки держим в переменных: :hover и :active переписывают box-shadow
+     целиком и раньше подставляли кремовые фаски любой кнопке — у зелёных и
+     красных они выглядели жёлто-белым бликом. */
+  --btn-top: #fff6d7;
+  --btn-bottom: #d9bf86;
   box-shadow:
     0 4px 0 var(--line),
-    inset 0 2px 0 #fff6d7,
-    inset 0 -3px 0 #d9bf86;
+    inset 0 2px 0 var(--btn-top),
+    inset 0 -3px 0 var(--btn-bottom);
   color: var(--ink);
   font-family: var(--font-pixel);
   font-size: 15px;
@@ -1062,16 +1248,16 @@ html[data-holiday="on"] .island-grass {
   transform: translateY(-1px);
   box-shadow:
     0 5px 0 var(--line),
-    inset 0 2px 0 #fff9e5,
-    inset 0 -3px 0 #d9bf86;
+    inset 0 2px 0 var(--btn-top),
+    inset 0 -3px 0 var(--btn-bottom);
 }
 
 .pixel-btn:active {
   transform: translateY(3px);
   box-shadow:
     0 1px 0 var(--line),
-    inset 0 2px 0 #fff4cf,
-    inset 0 -2px 0 #d9bf86;
+    inset 0 2px 0 var(--btn-top),
+    inset 0 -2px 0 var(--btn-bottom);
 }
 
 .icon-btn {
@@ -1091,10 +1277,12 @@ html[data-holiday="on"] .island-grass {
 .year-jump {
   position: relative;
   background: var(--gold);
+  --btn-top: #fff2a6;
+  --btn-bottom: #d9a32c;
   box-shadow:
     0 4px 0 var(--line),
-    inset 0 2px 0 #fff2a6,
-    inset 0 -3px 0 #d9a32c;
+    inset 0 2px 0 var(--btn-top),
+    inset 0 -3px 0 var(--btn-bottom);
 }
 
 .year-jump:hover {
@@ -1278,14 +1466,28 @@ html[data-holiday="on"] .island-grass {
 
   html[data-month-fit="compact"] .day-cell,
   html[data-month-fit="tight"] .day-cell {
-    padding: 6px 7px;
+    padding: 5px 7px;
   }
 
-  /* compact: одна строка задачи; tight: только точки вместо списка */
+  /* Кнопка «+» в ячейке видна только под курсором, но занимала 14px высоты
+     и как flex-элемент сжимала список дел до верхней кромки плашки.
+     В тесных режимах убираем её совсем. */
+  html[data-month-fit="compact"] .day-add,
+  html[data-month-fit="tight"] .day-add {
+    display: none;
+  }
+
+  /* compact: одна строка задачи целиком; tight: только точки вместо списка */
   html[data-month-fit="compact"] .day-tasks,
   html[data-month-fit="tight"] .day-tasks {
     display: flex;
-    margin-top: 3px;
+    margin-top: 2px;
+  }
+
+  /* Плашку дела не даём сжимать: иначе flex урезает её и текст пропадает. */
+  html[data-month-fit="compact"] .day-tasks {
+    flex: 0 0 auto;
+    min-height: 0;
   }
 
   html[data-month-fit="compact"] .day-tasks > :nth-child(n+2) {
@@ -1967,15 +2169,29 @@ html[data-holiday="on"] .island-grass {
   color: #745f3e;
 }
 
+/* Подвал стоит внизу страницы, поверх травы и земли, а не на кремовой бумаге:
+   днём тёмно-зелёный текст на земле давал 2:1. Своя «бумажная» плашка
+   держит контраст в обеих фазах — ночную заливку панелей подвал не получает. */
 .page-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 20px 4px 0;
-  color: rgba(54, 66, 41, 0.78);
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: rgba(255, 251, 241, 0.92);
+  border: 2px solid rgba(58, 41, 27, 0.55);
+  box-shadow: inset 0 -3px 0 rgba(58, 41, 27, 0.1);
+  color: #4c5a34;
   font-size: 11.5px;
   font-weight: 800;
+}
+
+html[data-daytime="night"] .page-footer {
+  background: rgba(24, 32, 52, 0.92);
+  border-color: rgba(146, 163, 199, 0.45);
+  box-shadow: inset 0 -3px 0 rgba(11, 16, 32, 0.5);
+  color: #dceccb;
 }
 
 .page-footer p {
@@ -2073,7 +2289,8 @@ html[data-profile="full"] .day-dialog::backdrop {
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #2f5c21;
+  /* На зелёной полосе заголовка тёмный подзаголовок давал 4.2:1 — дожимаем. */
+  color: #1c3d12;
 }
 
 .dialog-head h3 {
@@ -2455,10 +2672,12 @@ html[data-profile="full"] .day-dialog::backdrop {
   padding-inline: 13px;
   background: var(--green);
   color: #17310f;
+  --btn-top: #b9f397;
+  --btn-bottom: #4d9b35;
   box-shadow:
     0 4px 0 var(--line),
-    inset 0 2px 0 #b9f397,
-    inset 0 -3px 0 #4d9b35;
+    inset 0 2px 0 var(--btn-top),
+    inset 0 -3px 0 var(--btn-bottom);
 }
 
 .add-btn:hover {
@@ -2608,6 +2827,37 @@ html[data-profile="full"] .day-dialog::backdrop {
 .update-close:focus-visible {
   border-color: var(--line);
   color: var(--ink);
+}
+
+/* Полоса обновления стоит вне множительного слоя затемнения (position: fixed),
+   поэтому ночью показывала дневную бумагу — как раньше тост. Тёмная плашка,
+   светлый текст, ночная рамка и читаемая кнопка. */
+html[data-daytime="night"] .update-bar {
+  background: #2b3650;
+  border-color: #43506e;
+  box-shadow: 0 5px 0 #070b16;
+  color: #f2e8d5;
+}
+
+html[data-daytime="night"] .update-copy span,
+html[data-daytime="night"] .update-close {
+  color: #c9bfa8;
+}
+
+html[data-daytime="night"] .update-badge {
+  border-color: #43506e;
+  box-shadow:
+    0 0 0 2px #43506e,
+    inset 0 2px 0 #b9f397;
+}
+
+html[data-daytime="night"] .update-action {
+  background: #2b3d1f;
+  border-color: #55684a;
+  box-shadow:
+    0 4px 0 #0b1207,
+    inset 0 2px 0 #465c39;
+  color: #f2e8d5;
 }
 
 body.has-update-bar .toast {
@@ -3184,10 +3434,12 @@ body.has-update-bar .toast {
   padding-inline: 12px;
   background: var(--green);
   color: #17310f;
+  --btn-top: #b9f397;
+  --btn-bottom: #4d9b35;
   box-shadow:
     0 4px 0 var(--line),
-    inset 0 2px 0 #b9f397,
-    inset 0 -3px 0 #4d9b35;
+    inset 0 2px 0 var(--btn-top),
+    inset 0 -3px 0 var(--btn-bottom);
 }
 
 .quick-add-btn:hover {
@@ -4074,10 +4326,12 @@ html[data-profile="full"] .tool-dialog::backdrop {
 .danger-btn {
   background: #ffd9cf;
   color: #8c2e24;
+  --btn-top: #fff0ea;
+  --btn-bottom: #d99a8b;
   box-shadow:
     0 4px 0 var(--line),
-    inset 0 2px 0 #fff0ea,
-    inset 0 -3px 0 #d99a8b;
+    inset 0 2px 0 var(--btn-top),
+    inset 0 -3px 0 var(--btn-bottom);
 }
 
 .danger-btn:hover {

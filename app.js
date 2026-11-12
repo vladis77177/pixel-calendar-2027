@@ -1106,6 +1106,12 @@
     return wrapper;
   }
 
+  // Порог compact: в ячейке должно хватать места на номер дня и одну строку
+  // дела целиком — рамка 4 + отступы 10 + строка дня 22 + зазор 2 + плашка 19.
+  const COMPACT_MIN = 60;
+  // Выше этого порога в список влезает и вторая строка (см. styles.css).
+  const FULL_MIN = 88;
+
   // Подгоняет высоту строк месяца под окно: на сайте и планшете весь месяц
   // должен быть виден без прокрутки. Узкие экраны не трогаем.
   function fitMonthView() {
@@ -1161,13 +1167,14 @@
     // убираем декоративный подвал и считаем заново — он отдаёт сетке около 50px.
     delete root.dataset.monthTight;
     let rowHeight = solve();
-    if (rowHeight < 62) {
+    if (rowHeight < COMPACT_MIN) {
       root.dataset.monthTight = "on";
       rowHeight = solve();
     }
 
     root.style.setProperty("--month-row", `${rowHeight}px`);
-    root.dataset.monthFit = rowHeight < 62 ? "tight" : (rowHeight < 88 ? "compact" : "full");
+    root.dataset.monthFit =
+      rowHeight < COMPACT_MIN ? "tight" : (rowHeight < FULL_MIN ? "compact" : "full");
   }
 
   let fitMonthTimer = 0;
