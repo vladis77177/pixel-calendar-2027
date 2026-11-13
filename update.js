@@ -4,7 +4,7 @@
   "use strict";
 
   const REPO = "vladis77177/pixel-calendar-2027";
-  const APK_NAME = "pixel-calendar-2027-debug.apk";
+  const APK_NAME = "pixel-calendar-2027-release.apk";
 
   function parts(value) {
     const match = String(value || "")

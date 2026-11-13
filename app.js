@@ -3050,7 +3050,7 @@
     : "https://api.github.com/repos/vladis77177/pixel-calendar-2027/releases/latest";
   const RELEASE_APK = window.PixelUpdate
     ? window.PixelUpdate.apkDownloadUrl()
-    : "https://github.com/vladis77177/pixel-calendar-2027/releases/latest/download/pixel-calendar-2027-debug.apk";
+    : "https://github.com/vladis77177/pixel-calendar-2027/releases/latest/download/pixel-calendar-2027-release.apk";
   const UPDATE_DISMISS_KEY = "pixel-calendar-update-dismissed";
   const RELEASE_CACHE_KEY = "pixel-calendar-release-check";
   // Кэш показывается сразу и живёт офлайн сколько угодно, но в сеть ходим

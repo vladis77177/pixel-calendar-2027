@@ -43,7 +43,7 @@ test("app checks GitHub releases only for installed APK", () => {
   const app = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
   const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
   assert.ok(app.includes("api.github.com/repos/vladis77177/pixel-calendar-2027/releases/latest"));
-  assert.ok(app.includes("pixel-calendar-2027-debug.apk"));
+  assert.ok(app.includes("pixel-calendar-2027-release.apk"));
   assert.ok(app.includes("if (!isNativeApp() || !currentVersion()) return;"));
   assert.ok(html.includes('id="updateBar"'), "update banner markup is missing");
   assert.ok(html.includes("api.github.com"), "CSP must allow the release check");
@@ -54,7 +54,7 @@ test("APK download link always points at the latest release", () => {
   assert.ok(url.includes("/releases/latest/download/"), "link must use the latest release");
   assert.ok(!/\/download\/v\d/.test(url), "link must not be pinned to one release tag");
   assert.ok(!/\/releases\/tag\//.test(url), "link must not be pinned to a tag page");
-  assert.ok(url.endsWith("pixel-calendar-2027-debug.apk"));
+  assert.ok(url.endsWith("pixel-calendar-2027-release.apk"));
   assert.ok(releaseApiUrl().endsWith("/releases/latest"));
 });
 
