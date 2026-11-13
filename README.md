@@ -2,6 +2,12 @@
 
 Милый календарь в духе Minecraft на чистом HTML, CSS и JavaScript — без сборки и зависимостей.
 
+**Живое демо:** https://vladis77177.github.io/pixel-calendar-2027/ — открывается в браузере, ставится как PWA, данные остаются на устройстве.
+
+| День | Ночь | Год | Окно дня |
+|---|---|---|---|
+| ![Месяц, день](assets/screenshots/month-day.png) | ![Месяц, ночь](assets/screenshots/month-night.png) | ![Год](assets/screenshots/year-day.png) | ![Окно дня](assets/screenshots/day-dialog.png) |
+
 ## Как открыть
 
 Самый простой способ: открыть `index.html` в браузере. Календарь работает и как обычный файл.
