@@ -2,6 +2,13 @@
   "use strict";
 
   const STORAGE_KEY = "pixel-calendar-2027-v1";
+  // Аварийные копии: BACKUP — последний рабочий снимок, CORRUPT — сырая строка, которую
+  // не удалось разобрать (для ручного спасения). Большие хранилища не копируем: квота.
+  const BACKUP_KEY = "pixel-calendar-2027-backup";
+  const CORRUPT_KEY = "pixel-calendar-2027-corrupt";
+  const BACKUP_LIMIT = 512 * 1024;
+
+  let storeWasCorrupt = false;
   const VIEWS = ["week", "month", "quarter", "year"];
   const PROFILES = ["auto", "mobile", "full"];
   const DENSITIES = ["comfortable", "compact"];
@@ -177,7 +184,11 @@
     updateTitle: document.getElementById("updateTitle"),
     updateText: document.getElementById("updateText"),
     updateAction: document.getElementById("updateAction"),
-    updateDismiss: document.getElementById("updateDismiss")
+    updateDismiss: document.getElementById("updateDismiss"),
+    recoverBar: document.getElementById("recoverBar"),
+    recoverText: document.getElementById("recoverText"),
+    recoverRestore: document.getElementById("recoverRestore"),
+    recoverDismiss: document.getElementById("recoverDismiss")
   };
 
   const initialToday = startOfDay(new Date());
@@ -473,12 +484,58 @@
     };
   }
 
+  // Аварийные копии: следующее сохранение не должно затирать единственный экземпляр данных.
+  function readWrappedStore(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed.raw !== "string") return null;
+      return { at: Number(parsed.at) || 0, raw: parsed.raw };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function writeWrappedStore(key, raw, extra) {
+    try {
+      localStorage.setItem(key, JSON.stringify({ at: Date.now(), raw, ...extra }));
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function clearWrappedStore(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch (error) {
+      /* хранилище недоступно — чистить нечего */
+    }
+  }
+
+  function stashPreviousStore(raw) {
+    if (!raw || raw.length > BACKUP_LIMIT) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return;
+      // Копия нужна только до следующего успешного сохранения; старое значение не храним.
+      if (readWrappedStore(BACKUP_KEY)) return;
+      writeWrappedStore(BACKUP_KEY, raw);
+    } catch (error) {
+      /* предыдущее значение уже битое: его сохранит loadStore в CORRUPT */
+    }
+  }
+
   function loadStore() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return normalizeStore(null);
       return normalizeStore(JSON.parse(raw));
     } catch (error) {
+      storeWasCorrupt = true;
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) writeWrappedStore(CORRUPT_KEY, raw, { error: String((error && error.message) || error) });
       return normalizeStore(null);
     }
   }
@@ -492,13 +549,15 @@
         state.settings.updatedAt = Date.now();
         settingsFingerprint = fingerprint;
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        version: 4,
+      const payload = JSON.stringify({
+        version: window.PixelSync.SCHEMA_VERSION,
         view: state.view,
         tasks: state.tasks,
         series: state.series,
         settings: state.settings
-      }));
+      });
+      stashPreviousStore(localStorage.getItem(STORAGE_KEY));
+      localStorage.setItem(STORAGE_KEY, payload);
       syncNativeWidget();
       if (window.PixelSync && !applyingRemote) {
         window.PixelSync.scheduleSync(2000);
@@ -2149,7 +2208,7 @@
   function exportJson() {
     const payload = {
       app: "pixel-calendar-2027",
-      version: 3,
+      version: window.PixelSync.SCHEMA_VERSION,
       exportedAt: new Date().toISOString(),
       view: state.view,
       tasks: state.tasks,
@@ -2448,7 +2507,7 @@
     if (!window.PixelSync) return;
     window.PixelSync.configure({
       getState: () => ({
-        version: 3,
+        version: window.PixelSync.SCHEMA_VERSION,
         view: state.view,
         tasks: state.tasks,
         series: state.series,
@@ -2905,6 +2964,11 @@
       const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable);
       const anyDialogOpen = Boolean(document.querySelector("dialog[open]"));
       if (typing) return;
+      // Раскладка не важна: в русской раскладке T/N дают «е»/«т» в event.key,
+      // поэтому буквы ловим по физической клавише (event.code), слэш — по обоим признакам.
+      const code = event.code || "";
+      const key = (event.key || "").toLowerCase();
+      const isLetter = (letter) => code === `Key${letter.toUpperCase()}` || key === letter;
       if (event.key === "Escape" && anyDialogOpen) return;
       if (event.key === "ArrowLeft" && !anyDialogOpen) {
         event.preventDefault();
@@ -2912,13 +2976,13 @@
       } else if (event.key === "ArrowRight" && !anyDialogOpen) {
         event.preventDefault();
         shiftPeriod(1);
-      } else if (event.key.toLowerCase() === "t" && !anyDialogOpen) {
+      } else if (isLetter("t") && !anyDialogOpen) {
         event.preventDefault();
         goToToday();
-      } else if (event.key.toLowerCase() === "n" && !anyDialogOpen) {
+      } else if (isLetter("n") && !anyDialogOpen) {
         event.preventDefault();
         els.quickAddInput.focus();
-      } else if (event.key === "/" && !anyDialogOpen) {
+      } else if ((code === "Slash" || event.key === "/") && !anyDialogOpen) {
         event.preventDefault();
         openSearch();
       }
@@ -3130,6 +3194,94 @@
     }
   }
 
+  // Битое хранилище: показываем шанс вернуть предыдущее сохранение вместо тихой потери.
+  function countBackupTasks(raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      const tasks = parsed && parsed.tasks;
+      if (!tasks || typeof tasks !== "object") return 0;
+      let count = 0;
+      Object.keys(tasks).forEach((iso) => {
+        if (!Array.isArray(tasks[iso])) return;
+        tasks[iso].forEach((task) => {
+          if (task && !task.deletedAt && task.text) count += 1;
+        });
+      });
+      return count;
+    } catch (error) {
+      return 0;
+    }
+  }
+
+  function backupStamp(at) {
+    if (!at) return "неизвестное время";
+    try {
+      return new Date(at).toLocaleString("ru-RU", {
+        day: "numeric",
+        month: "long",
+        hour: "2-digit",
+        minute: "2-digit"
+      });
+    } catch (error) {
+      return new Date(at).toISOString();
+    }
+  }
+
+  function hideRecoverBar() {
+    if (els.recoverBar) els.recoverBar.hidden = true;
+    document.body.classList.remove("has-recover-bar");
+  }
+
+  function restoreBackup() {
+    const backup = readWrappedStore(BACKUP_KEY);
+    let restored = null;
+    if (backup) {
+      try {
+        restored = normalizeStore(JSON.parse(backup.raw));
+      } catch (error) {
+        restored = null;
+      }
+    }
+    if (!restored) {
+      showToast("Копия тоже не читается");
+      return;
+    }
+    state.view = restored.view;
+    state.tasks = restored.tasks;
+    state.series = restored.series;
+    state.settings = restored.settings;
+    settingsFingerprint = fingerprintSettings(state.settings);
+    saveStore();
+    renderAll(false);
+    updateSettingsMeta();
+    clearWrappedStore(BACKUP_KEY);
+    clearWrappedStore(CORRUPT_KEY);
+    hideRecoverBar();
+    showToast("Данные восстановлены");
+  }
+
+  function setupRecovery() {
+    if (!els.recoverBar) return;
+    if (!storeWasCorrupt) return;
+    const backup = readWrappedStore(BACKUP_KEY);
+    if (!backup) {
+      showToast("Данные не прочитались, повреждённая копия сохранена");
+      return;
+    }
+    const count = countBackupTasks(backup.raw);
+    const countText = count ? `${count} ${plural(count, ["дело", "дела", "дел"])}` : "без дел, только настройки";
+    els.recoverText.textContent = `Данные не прочитались. Копия от ${backupStamp(backup.at)}: ${countText}.`;
+    els.recoverBar.hidden = false;
+    document.body.classList.add("has-recover-bar");
+    els.recoverRestore.addEventListener("click", restoreBackup);
+    els.recoverDismiss.addEventListener("click", () => {
+      clearWrappedStore(BACKUP_KEY);
+      clearWrappedStore(CORRUPT_KEY);
+      hideRecoverBar();
+      showToast("Копия удалена");
+    });
+  }
+
   function shouldRecheckRelease(cached) {
     const helper = window.PixelUpdate;
     if (helper && typeof helper.shouldRecheck === "function") {
@@ -3338,6 +3490,7 @@
     setupNotifications();
     setupInstall();
     setupUpdateBar();
+    setupRecovery();
     registerServiceWorker();
     setupAppUpdateCheck();
     renderAll(true);

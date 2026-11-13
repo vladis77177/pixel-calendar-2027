@@ -244,6 +244,9 @@ function isoToday() {
       `[...document.querySelectorAll('.day-cell[data-date=\\"${today}\\"] .task-pill')].some((node) => node.textContent.includes("полить цветы"))`
     ));
 
+    // Снимок рабочего хранилища пригодится в проверке восстановления после порчи.
+    const goodStore = await cdp.eval(`localStorage.getItem("pixel-calendar-2027-v1")`);
+
     // 2. Окно дня: дело со временем напоминания.
     await cdp.eval(`document.querySelector('.day-cell[data-date="${today}"]').click(); true`);
     await cdp.waitFor(`document.querySelector("#dayDialog").open`, "окно дня открылось");
@@ -353,6 +356,68 @@ function isoToday() {
     check("очистка данных: счётчик обнулился", await cdp.eval(
       `document.querySelector("#progressValue").textContent.trim() === "0 / 0"`
     ), await cdp.eval(`document.querySelector("#progressValue").textContent.trim()`));
+
+    // 8. Хоткеи работают в русской раскладке: event.key там «е»/«т», ловим по event.code.
+    await cdp.eval(`(() => {
+      const dialog = document.querySelector("#settingsDialog");
+      if (dialog && dialog.open) dialog.close();
+      if (document.activeElement) document.activeElement.blur();
+      return true;
+    })()`);
+    await cdp.waitFor(`document.querySelector("#settingsDialog").open === false`, "настройки закрылись");
+    const hotkeys = await cdp.eval(`(() => {
+      const title = () => document.querySelector(".period-copy h2").textContent.trim();
+      const start = title();
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", code: "ArrowRight", bubbles: true }));
+      const shifted = title();
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "е", code: "KeyT", bubbles: true }));
+      const back = title();
+      const focusedByKey = document.activeElement && document.activeElement.id;
+      document.activeElement.blur();
+      document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "т", code: "KeyN", bubbles: true }));
+      const focused = document.activeElement && document.activeElement.id;
+      document.activeElement.blur();
+      return { start, shifted, back, focusedByKey, focused };
+    })()`);
+    check(
+      "хоткей T в русской раскладке возвращает к сегодня",
+      hotkeys.shifted !== hotkeys.start && hotkeys.back === hotkeys.start,
+      JSON.stringify(hotkeys)
+    );
+    check(
+      "хоткей N в русской раскладке ставит курсор в быстрое дело",
+      hotkeys.focused === "quickAddInput",
+      JSON.stringify(hotkeys)
+    );
+
+    // 9. Битое хранилище: предыдущий снимок предлагается и восстанавливается.
+    check("битый сторадж: снимок хранилища снят", typeof goodStore === "string" && goodStore.length > 20, String(goodStore).slice(0, 60));
+    await cdp.eval(`(() => {
+      localStorage.setItem("pixel-calendar-2027-backup", JSON.stringify({ at: Date.now(), raw: ${JSON.stringify(goodStore)} }));
+      localStorage.setItem("pixel-calendar-2027-v1", '{"tasks":[,');
+      return true;
+    })()`);
+    await cdp.eval(`location.reload(); true`);
+    await cdp.waitFor(
+      `(() => { const bar = document.querySelector("#recoverBar"); return Boolean(bar) && !bar.hidden; })()`,
+      "плашка восстановления появилась"
+    ).catch(async (error) => {
+      const state = await cdp.eval(`JSON.stringify({ keys: Object.keys(localStorage), hasEl: Boolean(document.querySelector("#recoverBar")), hidden: document.querySelector("#recoverBar") ? document.querySelector("#recoverBar").hidden : "no-el", cells: document.querySelectorAll(".day-cell").length })`);
+      throw new Error(`${error.message} | ${state}`);
+    });
+    const recoverText = await cdp.eval(`document.querySelector("#recoverText").textContent.trim()`);
+    check("битый сторадж: плашка предлагает копию", /Копия от/.test(recoverText), recoverText);
+    await cdp.eval(`document.querySelector("#recoverRestore").click(); true`);
+    await cdp.waitFor(
+      `document.querySelector("#recoverBar").hidden === true`,
+      "плашка восстановления скрылась"
+    );
+    check("битый сторадж: дело из копии вернулось", await cdp.eval(
+      `(${readStore})?.tasks?.[${JSON.stringify(today)}]?.some((task) => task.text === "Смоук: полить цветы") === true`
+    ));
+    check("битый сторадж: сырая порча больше не висит", await cdp.eval(
+      `localStorage.getItem("pixel-calendar-2027-corrupt") === null && localStorage.getItem("pixel-calendar-2027-backup") === null`
+    ));
 
     check("ошибок в консоли нет", consoleErrors.length === 0, consoleErrors.join(" | "));
     check("падений JS нет", exceptions.length === 0, exceptions.join(" | "));
