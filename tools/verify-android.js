@@ -58,6 +58,15 @@ const widgetFont = path.join(APP, "res", "font", "tiny5.ttf");
 check(fs.existsSync(widgetFont), "Missing widget font res/font/tiny5.ttf");
 if (fs.existsSync(widgetFont)) check(fs.statSync(widgetFont).size > 1000, "Empty widget font res/font/tiny5.ttf");
 
+// Дата виджета набирается Nunito ExtraBold: Tiny5 на 19sp теряет просветы в 2/8/0.
+const dateFont = path.join(APP, "res", "font", "nunito_date.ttf");
+check(fs.existsSync(dateFont), "Missing widget date font res/font/nunito_date.ttf");
+if (fs.existsSync(dateFont)) check(fs.statSync(dateFont).size > 4000, "Empty widget date font res/font/nunito_date.ttf");
+for (const layout of ["calendar_widget.xml", "calendar_widget_night.xml"]) {
+  const body = read(`res/layout/${layout}`);
+  check(body.includes('@font/nunito_date'), `${layout}: widget_date must use @font/nunito_date`);
+}
+
 const strings = read("res/values/strings.xml");
 check(strings.includes("widget_label"), "widget_label string is missing");
 check(strings.includes("widget_description"), "widget_description string is missing");

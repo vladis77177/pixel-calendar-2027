@@ -39,7 +39,7 @@
                 android:id="@+id/widget_date"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:fontFamily="@font/tiny5"
+                android:fontFamily="@font/nunito_date"
                 android:text="10 ноября 2026"
                 android:textColor="#F3E8CE"
                 android:textSize="19sp" />
