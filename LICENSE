@@ -1,0 +1,43 @@
+Copyright (c) 2026 vladis77177. All rights reserved except as granted below.
+
+Пиксельный календарь 2027 (Pixel Calendar 2027)
+===============================================
+
+This license covers the source code, styles, graphics, fonts bundled with the
+project (unless a separate license file says otherwise) and documentation in
+this repository ("the Work").
+
+1. You may read, run, copy and modify the Work for personal, educational and
+   other non-commercial purposes, and share your modified copies on the same
+   terms. You must keep this license and the copyright notice with every copy.
+
+2. Commercial use is not granted. "Commercial use" means any use intended for
+   or resulting in payment, including selling the Work or a derivative of it,
+   bundling it into a paid product or service, using it in advertising or in a
+   product offered in an app store, and providing paid support built on it.
+   Commercial use requires the prior written permission of the copyright
+   holder.
+
+3. Contributions. By sending a pull request, patch or other contribution you
+   grant the copyright holder a perpetual, worldwide, royalty-free, irrevocable
+   license to use, modify, distribute and relicense your contribution under any
+   terms, and you confirm you have the right to grant it.
+
+4. Third-party components keep their own licenses: the fonts in
+   `assets/fonts` are distributed under the SIL Open Font License 1.1 (see the
+   `OFL-*.txt` files next to them), and dependencies listed in
+   `package.json` / `THIRD-PARTY-NOTICES.md` keep their licenses.
+
+5. No trademark or name rights are granted: the project name, logo and visual
+   identity may not be used to promote a derivative without permission. The
+   project is not affiliated with, endorsed by or sponsored by Mojang or
+   Microsoft; "Minecraft" is a trademark of Mojang Synergies AB.
+
+6. THE WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM, OUT
+   OF OR IN CONNECTION WITH THE WORK OR THE USE OF THE WORK.
+
+Права: личное и некоммерческое использование разрешено, коммерческое — только
+с письменного разрешения автора. Шрифты — под SIL OFL 1.1, см. `OFL-*.txt`.
