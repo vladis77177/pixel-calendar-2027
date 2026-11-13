@@ -17,7 +17,7 @@
   const ACTION_TYPE_ID = "calendar-task";
   const ACTION_DONE = "done";
   const ACTION_SNOOZE = "snooze";
-  const DIGEST_TIME = "08:00";
+  const DIGEST_TIME_DEFAULT = "08:00";
   const DIGEST_HORIZON_DAYS = 7;
 
   function plugin() {
@@ -285,6 +285,12 @@
     return `${head} · ${short}${tail}`;
   }
 
+  // Время утренней сводки выбирается в настройках; мусор — к 08:00.
+  function digestTime(settings) {
+    const value = settings && typeof settings.digestTime === "string" ? settings.digestTime : "";
+    return TIME_PATTERN.test(value) ? value : DIGEST_TIME_DEFAULT;
+  }
+
   // Утренняя сводка: одно уведомление на день, только если она включена.
   function collectDigest(tasks, series, now, settings) {
     const result = new Map();
@@ -294,7 +300,7 @@
     const today = isoOf(current);
     for (let step = 0; step < DIGEST_HORIZON_DAYS; step += 1) {
       const iso = addDays(today, step);
-      const at = whenFor(iso, DIGEST_TIME);
+      const at = whenFor(iso, digestTime(settings));
       if (!at || at.getTime() <= floor) continue;
       const text = digestBody(tasks, series, iso);
       if (!text) continue;
@@ -419,6 +425,7 @@
     addActionListener,
     collectReminders,
     collectDigest,
+    digestTime,
     ensurePermission,
     cancel,
     resyncAll,

@@ -33,6 +33,7 @@ function state(tasks, series, settings) {
       holiday: "auto",
       weekStart: 1,
       morningDigest: false,
+      digestTime: "08:00",
       templates: [],
       updatedAt: 0,
       ...(settings || {})
@@ -272,4 +273,11 @@ test("слияние переносит «заранее» вместе с бо�
 
   const merged = mergeStates(local, remote);
   assert.equal(merged.tasks["2026-11-10"][0].leadMinutes, 60);
+});
+
+test("время сводки нормализуется как HH:MM", () => {
+  assert.equal(migrateState(state({}, [], { digestTime: "07:30" })).settings.digestTime, "07:30");
+  assert.equal(migrateState(state({}, [], { digestTime: "25:00" })).settings.digestTime, "08:00");
+  assert.equal(migrateState(state({}, [], {})).settings.digestTime, "08:00");
+  assert.equal(migrateState(state({}, [], null)).settings.digestTime, "08:00");
 });

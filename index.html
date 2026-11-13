@@ -527,9 +527,13 @@
             <label class="toggle-row">
               <input type="checkbox" id="digestToggle">
               <span class="toggle-mark" aria-hidden="true"></span>
-              <span>Утренняя сводка в 08:00</span>
+              <span>Утренняя сводка</span>
             </label>
-            <p class="settings-note">Одно уведомление со списком дел на день. Работает в APK; по умолчанию выключено.</p>
+            <div class="settings-field">
+              <label for="digestTime">Время сводки</label>
+              <input type="time" id="digestTime" value="08:00" step="60" disabled>
+            </div>
+            <p class="settings-note">Одно уведомление со списком дел на день в выбранное время. Работает в APK; по умолчанию выключено.</p>
           </div>
           <p class="settings-note">Мобильный профиль отключает размытие подложки и тяжёлые тени, поэтому меню открываются плавнее. «Авто» выбирает его сам на Android.</p>
         </section>

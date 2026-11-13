@@ -4222,6 +4222,17 @@ html[data-profile="full"] .tool-dialog::backdrop {
   outline-offset: 2px;
 }
 
+.settings-field input[type="time"] {
+  flex: 0 1 auto;
+  width: auto;
+  max-width: 62%;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-field input[type="time"]:disabled {
+  opacity: 0.5;
+}
+
 .sync-status {
   margin-top: 8px;
 }

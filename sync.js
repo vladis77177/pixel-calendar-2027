@@ -20,6 +20,7 @@
     holiday: "auto",
     weekStart: 1,
     morningDigest: false,
+    digestTime: "08:00",
     templates: [],
     updatedAt: 0
   };
@@ -46,6 +47,7 @@
       ...DEFAULT_SETTINGS,
       ...source,
       morningDigest: source.morningDigest === true,
+      digestTime: normalizeDigestTime(source.digestTime),
       templates: normalizeTemplates(source.templates),
       updatedAt: timeMs(source.updatedAt)
     };
@@ -54,6 +56,11 @@
   function normalizeLead(value) {
     const number = Number(value);
     return LEAD_MINUTES.includes(number) ? number : null;
+  }
+
+  function normalizeDigestTime(value) {
+    const text = String(value || "");
+    return TIME_PATTERN.test(text) ? text : DEFAULT_SETTINGS.digestTime;
   }
 
   function timeMs(value) {

@@ -15,6 +15,7 @@
     dusk: "#e2886a",
     night: "#101a33"
   };
+  const DIGEST_TIME_DEFAULT = "08:00";
   const DEFAULT_SETTINGS = {
     showHolidays: true,
     profile: "auto",
@@ -26,6 +27,7 @@
     holiday: "auto",
     weekStart: 1,
     morningDigest: false,
+    digestTime: DIGEST_TIME_DEFAULT,
     templates: []
   };
   const REPEATS = ["none", "daily", "weekdays", "weekly", "monthly", "yearly"];
@@ -146,6 +148,7 @@
     holidaySelect: document.getElementById("holidaySelect"),
     digestRow: document.getElementById("digestRow"),
     digestToggle: document.getElementById("digestToggle"),
+    digestTime: document.getElementById("digestTime"),
     snow: document.querySelector(".snow"),
     decorToggle: document.getElementById("decorToggle"),
     settingsBuild: document.getElementById("settingsBuild"),
@@ -236,6 +239,11 @@
 
   function normalizeTimeValue(value) {
     return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || "")) ? String(value) : null;
+  }
+
+  // Время сводки: любое корректное HH:MM, иначе 08:00 по умолчанию.
+  function normalizeDigestTimeValue(value) {
+    return normalizeTimeValue(value) || DIGEST_TIME_DEFAULT;
   }
 
   function normalizeLeadValue(value) {
@@ -458,6 +466,7 @@
         holiday: HOLIDAY_MODES.includes(rawSettings.holiday) ? rawSettings.holiday : DEFAULT_SETTINGS.holiday,
         weekStart: rawSettings.weekStart === 0 ? 0 : 1,
         morningDigest: rawSettings.morningDigest === true,
+        digestTime: normalizeDigestTimeValue(rawSettings.digestTime),
         templates: normalizeTemplates(rawSettings.templates),
         updatedAt: Number(rawSettings.updatedAt) || 0
       }
@@ -1982,6 +1991,10 @@
     els.skySelect.value = state.settings.sky;
     els.holidaySelect.value = state.settings.holiday;
     els.digestToggle.checked = state.settings.morningDigest;
+    if (els.digestTime) {
+      els.digestTime.value = state.settings.digestTime;
+      els.digestTime.disabled = !state.settings.morningDigest;
+    }
     // В браузере системных уведомлений нет — не обещаем сводку.
     els.digestRow.hidden = !isNativeApp();
     if (els.templatesInput) els.templatesInput.value = state.settings.templates.join("\n");
@@ -2851,8 +2864,17 @@
 
     els.digestToggle.addEventListener("change", () => {
       state.settings.morningDigest = els.digestToggle.checked;
+      if (els.digestTime) els.digestTime.disabled = !state.settings.morningDigest;
       saveStore();
     });
+
+    if (els.digestTime) {
+      els.digestTime.addEventListener("change", () => {
+        state.settings.digestTime = normalizeDigestTimeValue(els.digestTime.value);
+        els.digestTime.value = state.settings.digestTime;
+        saveStore();
+      });
+    }
 
     els.exportJsonBtn.addEventListener("click", exportJson);
     els.exportIcsBtn.addEventListener("click", exportICS);

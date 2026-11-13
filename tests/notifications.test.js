@@ -325,3 +325,20 @@ test("утренняя сводка собирает дела и пропуск�
   assert.equal(first.text, "Дел: 1 дело · Позвонить");
   assert.equal(map.has(notify.notificationId("digest@2026-11-13")), false);
 });
+
+test("время сводки берётся из настроек, мусор — к 08:00", () => {
+  const now = new Date(2026, 10, 11, 7, 0, 0);
+  const tasks = { "2026-11-11": [{ id: "t1", text: "Позвонить" }] };
+
+  const early = notify.collectDigest(tasks, [], now, { morningDigest: true, digestTime: "07:30" });
+  const item = early.get(notify.notificationId("digest@2026-11-11"));
+  assert.ok(item);
+  assert.equal(item.at.getHours(), 7);
+  assert.equal(item.at.getMinutes(), 30);
+
+  assert.equal(notify.digestTime({ digestTime: "06:05" }), "06:05");
+  assert.equal(notify.digestTime({ digestTime: "25:00" }), "08:00");
+  assert.equal(notify.digestTime({ digestTime: 730 }), "08:00");
+  assert.equal(notify.digestTime({}), "08:00");
+  assert.equal(notify.digestTime(null), "08:00");
+});
