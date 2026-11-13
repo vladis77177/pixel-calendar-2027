@@ -45,10 +45,46 @@ function loadToken() {
   } catch (error) {
     // файла ещё нет — создадим ниже
   }
-  const token = crypto.randomBytes(4).toString("hex");
+  const token = crypto.randomBytes(16).toString("hex");
   fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(TOKEN_FILE, `${token}\n`, { mode: 0o600 });
   return token;
+}
+
+// Сравнение кода подключения побайтово: обычное === завершается на первом
+// несовпавшем символе и по времени ответа выдаёт, сколько символов угадано.
+function tokensMatch(candidate, expected) {
+  const left = Buffer.from(String(candidate || ""), "utf8");
+  const right = Buffer.from(String(expected || ""), "utf8");
+  if (left.length !== right.length) return false;
+  return crypto.timingSafeEqual(left, right);
+}
+
+// Простейшая защита от перебора кода: после AUTH_MAX_FAILURES промахов с одного
+// адреса вход закрывается на AUTH_LOCK_MS. Держим только неудачные попытки.
+const AUTH_MAX_FAILURES = 10;
+const AUTH_LOCK_MS = 60 * 1000;
+const authFailures = new Map();
+
+function authLocked(ip) {
+  const entry = authFailures.get(ip);
+  if (!entry) return false;
+  if (Date.now() - entry.last > AUTH_LOCK_MS) {
+    authFailures.delete(ip);
+    return false;
+  }
+  return entry.count >= AUTH_MAX_FAILURES;
+}
+
+function noteAuthFailure(ip) {
+  const entry = authFailures.get(ip);
+  const now = Date.now();
+  if (!entry || now - entry.last > AUTH_LOCK_MS) {
+    authFailures.set(ip, { count: 1, last: now });
+    return;
+  }
+  entry.count += 1;
+  entry.last = now;
 }
 
 function loadState() {
@@ -164,10 +200,17 @@ function readBody(req, callback) {
 }
 
 function handleApi(req, res) {
-  if (req.headers["x-sync-token"] !== token) {
+  const ip = (req.socket && req.socket.remoteAddress) || "unknown";
+  if (authLocked(ip)) {
+    sendJson(res, 429, { error: "Слишком много попыток. Подождите минуту." });
+    return;
+  }
+  if (!tokensMatch(req.headers["x-sync-token"], token)) {
+    noteAuthFailure(ip);
     sendJson(res, 401, { error: "Неверный код подключения" });
     return;
   }
+  authFailures.delete(ip);
 
   if (req.method === "GET") {
     sendJson(res, 200, publicState());

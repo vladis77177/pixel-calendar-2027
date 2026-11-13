@@ -108,6 +108,22 @@ test("сервер синхронизации", async (t) => {
     assert.equal(response.status, 401);
   });
 
+  await t.test("неверный код той же длины — 401", async () => {
+    const wrong = "0".repeat(TOKEN.length);
+    assert.notEqual(wrong, TOKEN);
+    const response = await fetch(`${base}/api/state`, {
+      headers: { "X-Sync-Token": wrong }
+    });
+    assert.equal(response.status, 401);
+  });
+
+  await t.test("слишком короткий код — 401", async () => {
+    const response = await fetch(`${base}/api/state`, {
+      headers: { "X-Sync-Token": TOKEN.slice(0, 4) }
+    });
+    assert.equal(response.status, 401);
+  });
+
   await t.test("с кодом — пустое состояние v3", async () => {
     const response = await fetch(`${base}/api/state`, { headers });
     assert.equal(response.status, 200);
@@ -226,5 +242,51 @@ test("сервер синхронизации", async (t) => {
     const response = await fetch(`http://127.0.0.1:${secondPort}/api/state`, { headers });
     const data = await response.json();
     assert.ok(data.tasks["2026-11-10"], "состояние восстановлено из датированной копии");
+  });
+});
+
+test("защита доступа к серверу синхронизации", async (t) => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "pixel-sync-guard-"));
+
+  await t.test("код подключения генерируется длинным", async () => {
+    const port = await freePort();
+    const child = spawn(process.execPath, [path.join(ROOT, "sync-server", "server.js")], {
+      env: { ...process.env, PORT: String(port), HOST: "127.0.0.1", SYNC_DATA_DIR: dataDir },
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    t.after(() => child.kill());
+    await waitForServer(child);
+
+    const saved = fs.readFileSync(path.join(dataDir, "token.txt"), "utf8").trim();
+    assert.match(saved, /^[0-9a-f]{32}$/, "код — 16 байт в hex, а не 4");
+  });
+
+  await t.test("перебор кода запирает вход на минуту", async () => {
+    const port = await freePort();
+    const child = spawn(process.execPath, [path.join(ROOT, "sync-server", "server.js")], {
+      env: {
+        ...process.env,
+        PORT: String(port),
+        HOST: "127.0.0.1",
+        SYNC_TOKEN: "a".repeat(32),
+        SYNC_DATA_DIR: dataDir
+      },
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    t.after(() => child.kill());
+    await waitForServer(child);
+
+    const base = `http://127.0.0.1:${port}/api/state`;
+    const wrong = { "X-Sync-Token": "b".repeat(32) };
+    for (let i = 0; i < 10; i += 1) {
+      const response = await fetch(base, { headers: wrong });
+      assert.equal(response.status, 401, `попытка ${i + 1} отклонена как неверный код`);
+    }
+
+    const blocked = await fetch(base, { headers: wrong });
+    assert.equal(blocked.status, 429, "после десяти промахов вход закрыт");
+
+    const withGoodToken = await fetch(base, { headers: { "X-Sync-Token": "a".repeat(32) } });
+    assert.equal(withGoodToken.status, 429, "запертый адрес не пропускает даже верный код");
   });
 });

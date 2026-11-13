@@ -25,6 +25,11 @@ check(manifest.includes("RECEIVE_BOOT_COMPLETED"), "Boot permission is missing")
 check(manifest.includes("POST_NOTIFICATIONS"), "Notification permission is missing");
 check(manifest.includes("SCHEDULE_EXACT_ALARM"), "Exact alarm permission is missing");
 check(manifest.includes("calendar_widget_info"), "Widget metadata is missing");
+check(
+  /android:allowBackup="false"/.test(manifest),
+  "System backup must be off: the sync token lives in WebView localStorage"
+);
+check(!/android:allowBackup="true"/.test(manifest), "allowBackup=\"true\" leaks the sync token into cloud backups");
 
 const mainActivity = read(`java/${PACKAGE.split(".").join("/")}/MainActivity.java`);
 check(mainActivity.includes("registerPlugin(WidgetBridgePlugin.class)"), "WidgetBridge plugin is not registered");

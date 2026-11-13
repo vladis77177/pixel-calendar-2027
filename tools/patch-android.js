@@ -211,6 +211,14 @@ PERMISSIONS.forEach((name) => {
   );
 });
 
+// Код подключения к синхронизации лежит в localStorage WebView, а системный
+// автобэкап уносит его (и дела) в чужое хранилище. Свои данные пользователь
+// выгружает экспортом JSON или синхронизацией — автобэкап выключаем.
+if (!manifest.includes("android:allowBackup")) {
+  manifest = manifest.replace("<application", '<application android:allowBackup="false"');
+}
+manifest = manifest.replace(/android:allowBackup="true"/, 'android:allowBackup="false"');
+
 fs.writeFileSync(manifestFile, manifest);
 
 // 5b. Debug-манифест: cleartext-HTTP только для LAN-синхронизации.
