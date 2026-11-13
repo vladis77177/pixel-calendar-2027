@@ -835,6 +835,23 @@
     return node;
   }
 
+  // Цифры внутри подписи набираем Nunito: Tiny5 слипается на мелком кегле и в «2026»
+  // читается «2086». Текст остаётся пиксельным, меняются только числовые группы.
+  function numberize(node, text) {
+    node.replaceChildren();
+    String(text === undefined || text === null ? "" : text)
+      .split(/(\d+)/)
+      .forEach((part) => {
+        if (!part) return;
+        if (/^\d+$/.test(part)) {
+          node.appendChild(el("span", "num", part));
+        } else {
+          node.appendChild(document.createTextNode(part));
+        }
+      });
+    return node;
+  }
+
   function icon(id) {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "icon");
@@ -847,7 +864,7 @@
 
   function updateTodayLabel() {
     const today = startOfDay(new Date());
-    els.todayLabel.textContent = formatLongDate(today);
+    numberize(els.todayLabel, formatLongDate(today));
     els.todayChip.title = `${capitalize(WEEKDAYS_FULL[today.getDay()])}, ${formatLongDate(today)}`;
   }
 
@@ -861,8 +878,8 @@
 
   function renderPeriod() {
     const copy = periodCopy();
-    els.periodKicker.textContent = copy.kicker;
-    els.periodTitle.textContent = copy.title;
+    numberize(els.periodKicker, copy.kicker);
+    numberize(els.periodTitle, copy.title);
     els.yearJumpBtn.classList.toggle("is-2027", state.cursor.getFullYear() === 2027);
   }
 
@@ -871,7 +888,7 @@
     const date = fromISO(state.selectedDate);
     const today = isSameDay(date, new Date());
     const short = `${date.getDate()} ${MONTHS_GENITIVE[date.getMonth()]}`;
-    els.quickAddDate.textContent = today ? `сегодня, ${short}` : `${short} ${date.getFullYear()}`;
+    numberize(els.quickAddDate, today ? `сегодня, ${short}` : `${short} ${date.getFullYear()}`);
     els.quickAddDate.title = `Быстрое добавление на ${formatLongDate(date)}`;
   }
 
@@ -1415,7 +1432,7 @@
     els.dialogEyebrow.textContent = holiday
       ? `${WEEKDAYS_FULL[date.getDay()]} · ${holiday}`
       : WEEKDAYS_FULL[date.getDay()];
-    els.dialogTitle.textContent = formatLongDate(date);
+    numberize(els.dialogTitle, formatLongDate(date));
     els.daySummaryText.textContent = summary.text;
     els.dayProgressBar.style.width = `${percent}%`;
     els.taskList.setAttribute("aria-label", `Задачи на ${formatLongDate(date)}`);

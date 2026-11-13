@@ -1065,6 +1065,10 @@ html[data-holiday="on"] .island-grass {
   font-size: 0.78em;
   line-height: 1;
   color: #4a3013;
+  /* Год в логотипе — тоже цифры: Tiny5 на мелком кегле читается как «8087». */
+  font-family: var(--font-num);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .today-chip {
@@ -2301,6 +2305,17 @@ html[data-profile="full"] .day-dialog::backdrop {
   line-height: 1;
   color: #17310f;
   text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* Цифры внутри подписей набираем Nunito: у Tiny5 на мелком кегле просвет в 1 px,
+   и «2026» читается как «2086». Слова остаются пиксельными. */
+.num {
+  font-family: var(--font-num);
+  font-size: 1em;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  line-height: inherit;
 }
 
 .dialog-close {
