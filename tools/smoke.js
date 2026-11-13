@@ -419,6 +419,18 @@ function isoToday() {
       `localStorage.getItem("pixel-calendar-2027-corrupt") === null && localStorage.getItem("pixel-calendar-2027-backup") === null`
     ));
 
+    // 10. Поиск работает и не падает на серии: ввод с задержкой, потом результаты.
+    await cdp.eval(`(() => { document.querySelector("#searchBtn").click(); return true; })()`);
+    await cdp.waitFor(`document.querySelector("#searchDialog").open === true`, "поиск открылся");
+    await cdp.eval(`(() => { const input = document.querySelector("#searchInput"); input.value = "цветы"; input.dispatchEvent(new Event("input", { bubbles: true })); return true; })()`);
+    await cdp.waitFor(
+      `[...document.querySelectorAll("#searchResults .search-result, #searchResults li")].some((node) => node.textContent.includes("цветы"))`,
+      "поиск нашёл быстрое дело"
+    );
+    const searchCount = await cdp.eval(`document.querySelector("#searchInput").value + "|" + document.querySelector("#searchCount").textContent.trim()`);
+    check("поиск: находит дело по подстроке", searchCount.startsWith("цветы|") && searchCount.includes("1"), searchCount);
+    await cdp.eval(`(() => { const dialog = document.querySelector("#searchDialog"); if (dialog.open) dialog.close(); return true; })()`);
+
     check("ошибок в консоли нет", consoleErrors.length === 0, consoleErrors.join(" | "));
     check("падений JS нет", exceptions.length === 0, exceptions.join(" | "));
   } catch (error) {

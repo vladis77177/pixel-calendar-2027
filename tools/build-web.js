@@ -31,6 +31,20 @@ for (const file of FILES) {
   fs.copyFileSync(path.join(ROOT, file), path.join(OUT, file));
 }
 
+// Кэш service worker привязан к версии пакета: иначе CACHE_NAME бампали руками
+// и он расходился с релизом, а старый кэш продолжал отдавать прошлые файлы.
+const version = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version;
+const swPath = path.join(OUT, "sw.js");
+const swSource = fs.readFileSync(swPath, "utf8");
+const swBuilt = swSource.replace(
+  /const CACHE_NAME = "pixel-calendar-2027-v\d+";/,
+  `const CACHE_NAME = "pixel-calendar-2027-v${version}";`
+);
+if (swBuilt === swSource) {
+  throw new Error("sw.js: не нашёл CACHE_NAME — привязка кэша к версии сломана");
+}
+fs.writeFileSync(swPath, swBuilt);
+
 // Build info: commit hash and date are baked into www/index.html so the settings
 // dialog can show exactly which build is installed on the phone.
 const sha = (process.env.GITHUB_SHA || "").slice(0, 7);

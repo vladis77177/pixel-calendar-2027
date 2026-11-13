@@ -697,7 +697,13 @@
         };
       });
 
-    return tasks.concat(recurring).sort((a, b) => a.createdAt - b.createdAt);
+    // Сначала дела со временем — по часам; без времени — ниже, в порядке добавления.
+    return tasks.concat(recurring).sort((a, b) => {
+      if (a.time && b.time && a.time !== b.time) return a.time < b.time ? -1 : 1;
+      if (a.time && !b.time) return -1;
+      if (!a.time && b.time) return 1;
+      return a.createdAt - b.createdAt;
+    });
   }
 
   function getEntryByKey(iso, key) {
@@ -710,7 +716,11 @@
 
   function nextSeriesOccurrence(series, fromIso) {
     let cursor = fromISO(series.start > fromIso ? series.start : fromIso);
-    for (let index = 0; index < 800; index += 1) {
+    // Горизонт поиска вхождения тот же, что у напоминаний: меньше — серия «теряется» в поиске.
+    const horizon = window.PixelNotify && window.PixelNotify.MAX_LOOKAHEAD_DAYS
+      ? window.PixelNotify.MAX_LOOKAHEAD_DAYS
+      : 1500;
+    for (let index = 0; index < horizon; index += 1) {
       const iso = toISO(cursor);
       if (isSeriesActiveOn(series, iso)) return iso;
       cursor = addDays(cursor, 1);
@@ -2831,10 +2841,20 @@
     els.searchCloseBtn.addEventListener("click", () => hideDialog(els.searchDialog));
     bindDialogBackdrop(els.searchDialog, () => hideDialog(els.searchDialog));
 
-    els.searchInput.addEventListener("input", () => {
+    // Поиск пересобирается с задержкой: на каждый символ раньше прогонялись все серии.
+    let searchTimer = 0;
+    const runSearch = () => {
+      window.clearTimeout(searchTimer);
+      searchTimer = 0;
       state.searchQuery = els.searchInput.value;
       renderSearch();
+    };
+    els.searchInput.addEventListener("input", () => {
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(runSearch, 150);
     });
+    els.searchInput.addEventListener("change", runSearch);
+    els.searchInput.addEventListener("blur", runSearch);
 
     els.searchStatusButtons.forEach((button) => {
       button.addEventListener("click", () => {

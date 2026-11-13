@@ -415,6 +415,7 @@
 
   const api = {
     SERIES_HORIZON_DAYS,
+    MAX_LOOKAHEAD_DAYS,
     MAX_NOTIFICATIONS,
     isNative,
     notificationId,
