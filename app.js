@@ -5,8 +5,10 @@
   // Аварийные копии: BACKUP — последний рабочий снимок, CORRUPT — сырая строка, которую
   // не удалось разобрать (для ручного спасения). Большие хранилища не копируем: квота.
   const BACKUP_KEY = "pixel-calendar-2027-backup";
+  const BACKUP_STAMP_KEY = "pixel-calendar-2027-backup-at";
   const CORRUPT_KEY = "pixel-calendar-2027-corrupt";
   const BACKUP_LIMIT = 512 * 1024;
+  const BACKUP_REFRESH_MS = 10 * 60 * 1000;
 
   let storeWasCorrupt = false;
   const VIEWS = ["week", "month", "quarter", "year"];
@@ -188,6 +190,8 @@
     recoverBar: document.getElementById("recoverBar"),
     recoverText: document.getElementById("recoverText"),
     recoverRestore: document.getElementById("recoverRestore"),
+    recoverDownload: document.getElementById("recoverDownload"),
+    recoverDrop: document.getElementById("recoverDrop"),
     recoverDismiss: document.getElementById("recoverDismiss")
   };
 
@@ -517,11 +521,14 @@
   function stashPreviousStore(raw) {
     if (!raw || raw.length > BACKUP_LIMIT) return;
     try {
+      // Копию обновляем не на каждом сохранении: разбор и запись до 512 КБ на каждый
+      // тап по галочке заметны. Достаточно «последнего рабочего снимка» раз в 10 минут.
+      const stamp = Number(localStorage.getItem(BACKUP_STAMP_KEY)) || 0;
+      if (stamp && Date.now() - stamp < BACKUP_REFRESH_MS) return;
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== "object") return;
-      // Копия нужна только до следующего успешного сохранения; старое значение не храним.
-      if (readWrappedStore(BACKUP_KEY)) return;
       writeWrappedStore(BACKUP_KEY, raw);
+      localStorage.setItem(BACKUP_STAMP_KEY, String(Date.now()));
     } catch (error) {
       /* предыдущее значение уже битое: его сохранит loadStore в CORRUPT */
     }
@@ -540,6 +547,12 @@
     }
   }
 
+  // Версия схемы — из sync.js; если модуль не загрузился, пишем последнюю известную,
+  // иначе сохранение падало бы целиком и человек терял данные.
+  function schemaVersion() {
+    return (window.PixelSync && window.PixelSync.SCHEMA_VERSION) || 4;
+  }
+
   function saveStore() {
     try {
       // Настройки синхронизируются блоком, поэтому метка времени обновляется
@@ -550,7 +563,7 @@
         settingsFingerprint = fingerprint;
       }
       const payload = JSON.stringify({
-        version: window.PixelSync.SCHEMA_VERSION,
+        version: schemaVersion(),
         view: state.view,
         tasks: state.tasks,
         series: state.series,
@@ -2235,7 +2248,7 @@
   function exportJson() {
     const payload = {
       app: "pixel-calendar-2027",
-      version: window.PixelSync.SCHEMA_VERSION,
+      version: schemaVersion(),
       exportedAt: new Date().toISOString(),
       view: state.view,
       tasks: state.tasks,
@@ -2534,7 +2547,7 @@
     if (!window.PixelSync) return;
     window.PixelSync.configure({
       getState: () => ({
-        version: window.PixelSync.SCHEMA_VERSION,
+        version: schemaVersion(),
         view: state.view,
         tasks: state.tasks,
         series: state.series,
@@ -3270,6 +3283,8 @@
   }
 
   function restoreBackup() {
+    // Копию и повреждённую строку не удаляем: если восстановление окажется неудачным,
+    // спасать будет нечего. Чистятся они только явными кнопками.
     const backup = readWrappedStore(BACKUP_KEY);
     let restored = null;
     if (backup) {
@@ -3291,31 +3306,57 @@
     saveStore();
     renderAll(false);
     updateSettingsMeta();
-    clearWrappedStore(BACKUP_KEY);
-    clearWrappedStore(CORRUPT_KEY);
     hideRecoverBar();
     showToast("Данные восстановлены");
+  }
+
+  function downloadRawStore() {
+    const raw = localStorage.getItem(CORRUPT_KEY);
+    const backup = readWrappedStore(BACKUP_KEY);
+    const source = raw || (backup && backup.raw);
+    if (!source) {
+      showToast("Сохранять нечего");
+      return;
+    }
+    downloadFile(`pixel-calendar-2027-raw-${new Date().toISOString().slice(0, 10)}.json`, source, "application/json");
+    showToast("Сырая строка сохранена");
+  }
+
+  function dropRecoveryCopies() {
+    clearWrappedStore(BACKUP_KEY);
+    clearWrappedStore(CORRUPT_KEY);
+    try {
+      localStorage.removeItem(BACKUP_STAMP_KEY);
+    } catch (error) {
+      /* хранилище недоступно — чистить нечего */
+    }
+    hideRecoverBar();
+    showToast("Копии удалены");
   }
 
   function setupRecovery() {
     if (!els.recoverBar) return;
     if (!storeWasCorrupt) return;
     const backup = readWrappedStore(BACKUP_KEY);
-    if (!backup) {
+    if (!backup && !localStorage.getItem(CORRUPT_KEY)) {
       showToast("Данные не прочитались, повреждённая копия сохранена");
       return;
     }
-    const count = countBackupTasks(backup.raw);
+    const count = backup ? countBackupTasks(backup.raw) : 0;
     const countText = count ? `${count} ${plural(count, ["дело", "дела", "дел"])}` : "без дел, только настройки";
-    els.recoverText.textContent = `Данные не прочитались. Копия от ${backupStamp(backup.at)}: ${countText}.`;
+    els.recoverText.textContent = backup
+      ? `Данные не прочитались. Копия от ${backupStamp(backup.at)}: ${countText}.`
+      : "Данные не прочитались. Повреждённую строку можно скачать и спасти вручную.";
+    els.recoverRestore.hidden = !backup;
     els.recoverBar.hidden = false;
     document.body.classList.add("has-recover-bar");
     els.recoverRestore.addEventListener("click", restoreBackup);
+    if (els.recoverDownload) els.recoverDownload.addEventListener("click", downloadRawStore);
+    if (els.recoverDrop) els.recoverDrop.addEventListener("click", dropRecoveryCopies);
     els.recoverDismiss.addEventListener("click", () => {
-      clearWrappedStore(BACKUP_KEY);
-      clearWrappedStore(CORRUPT_KEY);
+      // Крестик только скрывает плашку: копии остаются, пока их не уберут явно.
       hideRecoverBar();
-      showToast("Копия удалена");
+      showToast("Копии остались в хранилище");
     });
   }
 

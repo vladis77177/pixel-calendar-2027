@@ -636,6 +636,13 @@ html[data-daytime="night"] .settings-section {
   box-shadow: inset 0 2px 0 #fffef8;
 }
 
+/* Системные элементы (список режима, время) рисует сам Android: в ночной теме
+   их подкладка должна быть тёмной, иначе она вспыхивает белым. */
+html[data-daytime="night"] .settings-field select,
+html[data-daytime="night"] .settings-field input[type="time"] {
+  color-scheme: dark;
+}
+
 /* Неделя ночью: явные ночные цвета получил только месячный вид, поэтому здесь
    подписи выцветали — «Свободный день…» давал 3.1:1, названия дней 3.9–4.2:1. */
 html[data-daytime="night"] .week-day-name,
@@ -2827,6 +2834,25 @@ html[data-profile="full"] .day-dialog::backdrop {
   font-size: 12px;
 }
 
+/* Второстепенные действия плашки: тот же пиксельный вид, но светлее акцента. */
+.update-action-ghost {
+  background: #f7ecd2;
+  box-shadow:
+    0 3px 0 var(--line),
+    inset 0 2px 0 #fff8e7,
+    inset 0 -2px 0 #d8c49a;
+}
+
+.update-action-ghost:hover {
+  background: #fff4dc;
+}
+
+html[data-daytime="night"] .update-action-ghost {
+  background: #38445f;
+  border-color: #55684a;
+  color: #f2e8d5;
+}
+
 .update-close {
   display: grid;
   place-items: center;
@@ -4229,6 +4255,9 @@ html[data-profile="full"] .tool-dialog::backdrop {
   border: 3px solid var(--line);
   box-shadow: inset 0 3px 0 #f0e4c7;
   color: var(--ink);
+  /* Системный список выбора красится темой Android: без color-scheme он открывается
+     тёмной подкладкой даже в светлой теме приложения. */
+  color-scheme: light;
   font-family: var(--font-body);
   font-size: 12px;
   font-weight: 700;
@@ -4268,6 +4297,9 @@ html[data-profile="full"] .tool-dialog::backdrop {
   width: auto;
   max-width: 62%;
   font-variant-numeric: tabular-nums;
+  /* Системный выбор времени тоже открывается подкладкой Android: без color-scheme
+     она тёмная даже при светлой теме приложения. */
+  color-scheme: light;
 }
 
 .settings-field input[type="time"]:disabled {

@@ -287,9 +287,16 @@ test("версию схемы пишет только sync.js, а не app.js", 
   const fs = require("node:fs");
   const app = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
   assert.ok(!/version:\s*[1-9]\b/.test(app), "app.js не должен писать версию схемы числом");
-  assert.equal(
-    (app.match(/window\.PixelSync\.SCHEMA_VERSION/g) || []).length,
-    3,
-    "ожидаются три места: сохранение, экспорт и синк-пейлоад"
+  assert.ok(
+    !/version:\s*window\.PixelSync\.SCHEMA_VERSION/.test(app),
+    "app.js обязан брать версию через schemaVersion(): прямое обращение падало бы, если sync.js не загрузился"
+  );
+  assert.ok(
+    /\(window\.PixelSync && window\.PixelSync\.SCHEMA_VERSION\) \|\| \d+/.test(app),
+    "schemaVersion() обязана иметь запасное значение"
+  );
+  assert.ok(
+    !/versionCode \d+/.test(app),
+    "app.js не должен заниматься версиями сборки"
   );
 });

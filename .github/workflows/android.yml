@@ -53,6 +53,14 @@ jobs:
       - name: Run checks
         run: npm run check && npm test
 
+      - name: Install Chrome for the browser smoke run
+        uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: stable
+
+      - name: Run browser smoke
+        run: npm run smoke
+
       - name: Build web assets
         run: npm run build:web
 

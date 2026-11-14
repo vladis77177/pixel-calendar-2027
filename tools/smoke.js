@@ -24,6 +24,13 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function findChrome() {
   const candidates = [
+    process.env.CHROME_PATH,
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/snap/bin/chromium",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     path.join(process.env.ProgramFiles || "", "Google/Chrome/Application/chrome.exe"),
     path.join(process.env["ProgramFiles(x86)"] || "", "Google/Chrome/Application/chrome.exe"),
     path.join(process.env.LOCALAPPDATA || "", "Google/Chrome/Application/chrome.exe"),
@@ -415,7 +422,14 @@ function isoToday() {
     check("битый сторадж: дело из копии вернулось", await cdp.eval(
       `(${readStore})?.tasks?.[${JSON.stringify(today)}]?.some((task) => task.text === "Смоук: полить цветы") === true`
     ));
-    check("битый сторадж: сырая порча больше не висит", await cdp.eval(
+    check("битый сторадж: копии остаются после восстановления", await cdp.eval(
+      `localStorage.getItem("pixel-calendar-2027-corrupt") !== null && localStorage.getItem("pixel-calendar-2027-backup") !== null`
+    ));
+    check("битый сторадж: есть кнопки «Скачать копию» и «Убрать копии»", await cdp.eval(
+      `Boolean(document.querySelector("#recoverDownload")) && Boolean(document.querySelector("#recoverDrop"))`
+    ));
+    await cdp.eval(`document.querySelector("#recoverDrop").click(); true`);
+    check("битый сторадж: «Убрать копии» чистит хранилище", await cdp.eval(
       `localStorage.getItem("pixel-calendar-2027-corrupt") === null && localStorage.getItem("pixel-calendar-2027-backup") === null`
     ));
 

@@ -38,13 +38,14 @@ function readNative(file) {
 const packageDir = path.join(APP, "java", ...PACKAGE.split("."));
 fs.mkdirSync(packageDir, { recursive: true });
 
-for (const file of ["WidgetBridgePlugin.java", "CalendarWidgetProvider.java"]) {
+for (const file of ["WidgetBridgePlugin.java", "CalendarWidgetProvider.java", "MainActivity.java"]) {
   fs.writeFileSync(path.join(packageDir, file), readNative(file));
 }
 
-const mainActivity = findFile(path.join(APP, "java"), "MainActivity.java")
-  || path.join(packageDir, "MainActivity.java");
-fs.writeFileSync(mainActivity, readNative("MainActivity.java"));
+const mainActivity = findFile(path.join(APP, "java"), "MainActivity.java");
+if (mainActivity && mainActivity !== path.join(packageDir, "MainActivity.java")) {
+  fs.writeFileSync(mainActivity, readNative("MainActivity.java"));
+}
 
 // 2. Layouts, drawables and widget metadata
 fs.cpSync(
@@ -122,10 +123,10 @@ for (const [folder, size] of Object.entries({ mdpi: 24, hdpi: 36, xhdpi: 48, xxh
 }
 
 // 4. Splash screens: sky gradient with the centred grass block
-function drawSplash(width, height) {
+function drawSplash(width, height, night) {
   const pixels = Buffer.alloc(width * height * 4);
-  const top = [0x8b, 0xd8, 0xff];
-  const bottom = [0xe9, 0xff, 0xd6];
+  const top = night ? [0x0b, 0x10, 0x20] : [0x8b, 0xd8, 0xff];
+  const bottom = night ? [0x26, 0x31, 0x4f] : [0xe9, 0xff, 0xd6];
   for (let y = 0; y < height; y += 1) {
     const mix = height <= 1 ? 0 : y / (height - 1);
     const r = Math.round(top[0] + (bottom[0] - top[0]) * mix);
@@ -168,7 +169,12 @@ const SPLASHES = [
 for (const [folder, width, height] of SPLASHES) {
   const dir = path.join(APP, "res", folder);
   fs.mkdirSync(dir, { recursive: true });
-  writePng(path.join(dir, "splash.png"), width, height, drawSplash(width, height));
+  writePng(path.join(dir, "splash.png"), width, height, drawSplash(width, height, false));
+  // Ночной вариант: то же имя ресурса в drawable-night*, Android сам выберет по uiMode.
+  // Ночная тема при запуске и есть та вспышка, из-за которой светлый фон бил по глазам.
+  const nightFolder = path.join(APP, "res", folder.replace(/^drawable/, "drawable-night"));
+  fs.mkdirSync(nightFolder, { recursive: true });
+  writePng(path.join(nightFolder, "splash.png"), width, height, drawSplash(width, height, true));
 }
 
 // 5. Manifest: widget receiver + boot permission
@@ -233,6 +239,36 @@ const debugXml = `<?xml version="1.0" encoding="utf-8"?>
 if (!fs.existsSync(debugManifest) || fs.readFileSync(debugManifest, "utf8") !== debugXml) {
   fs.writeFileSync(debugManifest, debugXml);
   console.log("Debug manifest: cleartext enabled");
+}
+
+// 5c. Сеть в release-сборке. HTTP приложению нужен ровно для одного: адрес сервера
+// синхронизации вводит пользователь (192.168.x.x, 10.x.x.x или имя хоста), а CSP и
+// network-security-config не умеют диапазоны IP — белый список хостов тут не построить.
+// Поэтому cleartext разрешён, но только приложение решает, куда ходить.
+const networkConfigFile = path.join(APP, "res", "xml", "network_security_config.xml");
+fs.mkdirSync(path.dirname(networkConfigFile), { recursive: true });
+const networkConfig = `<?xml version="1.0" encoding="utf-8"?>
+<!-- HTTP нужен только для сервера синхронизации в локальной сети: адрес вводит
+     пользователь, диапазоны IP в network-security-config не поддерживаются. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
+`;
+if (!fs.existsSync(networkConfigFile) || fs.readFileSync(networkConfigFile, "utf8") !== networkConfig) {
+  fs.writeFileSync(networkConfigFile, networkConfig);
+}
+
+if (!/networkSecurityConfig/.test(manifest)) {
+  manifest = manifest.replace(
+    /android:allowBackup="false"/,
+    'android:allowBackup="false"\n        android:networkSecurityConfig="@xml/network_security_config"'
+  );
+  fs.writeFileSync(manifestFile, manifest);
+  console.log("Network security config: cleartext только для приватных диапазонов");
 }
 
 // 6. Widget strings
@@ -306,7 +342,12 @@ if (keystorePropertiesFile.exists()) {
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
 const versionName = pkg.version;
 const [major, minor, patch] = versionName.split(".").map((part) => Number(part) || 0);
-const versionCode = Math.max(1, major * 10000 + minor * 100 + patch);
+// Разряды не должны пересекаться: при схеме major*10000 + minor*100 + patch
+// версия 0.12.100 совпала бы с 0.13.0 и обновление не установилось бы.
+if (minor > 999 || patch > 999) {
+  throw new Error(`Версия ${versionName}: minor и patch должны быть меньше 1000, иначе versionCode пересечёт разряды`);
+}
+const versionCode = Math.max(1, major * 1000000 + minor * 1000 + patch);
 let versioned = fs.readFileSync(gradleFile, "utf8");
 versioned = versioned
   .replace(/versionCode \d+/, `versionCode ${versionCode}`)

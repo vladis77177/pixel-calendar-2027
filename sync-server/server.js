@@ -41,7 +41,10 @@ function loadToken() {
   if (process.env.SYNC_TOKEN) return process.env.SYNC_TOKEN;
   try {
     const saved = fs.readFileSync(TOKEN_FILE, "utf8").trim();
-    if (saved) return saved;
+    // Старый 8-символьный код (до 0.12.4) короче 32 hex: меняем его на полноценный,
+    // иначе фикс безопасности не доезжает до уже настроенных установок.
+    if (saved.length >= 32) return saved;
+    if (saved) console.log("Код подключения короче 32 знаков — заменяю на новый (введите его в приложении заново).");
   } catch (error) {
     // файла ещё нет — создадим ниже
   }

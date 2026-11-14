@@ -25,6 +25,14 @@ jobs:
           node-version: 22
       - name: Build
         run: npm run build:web
+      - name: Run checks
+        run: npm run check && npm test
+      - name: Install Chrome for the browser smoke run
+        uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: stable
+      - name: Run browser smoke
+        run: npm run smoke
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:

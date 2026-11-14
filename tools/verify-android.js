@@ -37,6 +37,26 @@ check(
   mainActivity.indexOf("registerPlugin(WidgetBridgePlugin.class)") < mainActivity.indexOf("super.onCreate"),
   "Plugin must be registered before super.onCreate"
 );
+check(
+  mainActivity.includes("setBackgroundColor"),
+  "WebView background must be painted, otherwise the launch and widget return flash white"
+);
+
+const networkConfig = read("res/xml/network_security_config.xml");
+check(
+  manifest.includes('android:networkSecurityConfig="@xml/network_security_config"'),
+  "Manifest must point at the network security config"
+);
+check(
+  networkConfig.includes('cleartextTrafficPermitted="true"'),
+  "Release build must allow cleartext HTTP: LAN sync needs it and IP ranges cannot be listed"
+);
+check(
+  read("java/" + PACKAGE.split(".").join("/") + "/MainActivity.java").includes("setBackgroundColor"),
+  "WebView background must be painted, otherwise launch flashes white"
+);
+read("res/drawable-night/splash.png");
+read("res/drawable-night-land-hdpi/splash.png");
 
 read(`java/${PACKAGE.split(".").join("/")}/WidgetBridgePlugin.java`);
 read(`java/${PACKAGE.split(".").join("/")}/CalendarWidgetProvider.java`);
