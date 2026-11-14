@@ -56,7 +56,11 @@ check(
   "WebView background must be painted, otherwise launch flashes white"
 );
 read("res/drawable-night/splash.png");
-read("res/drawable-night-land-hdpi/splash.png");
+read("res/drawable-land-night-hdpi/splash.png");
+check(
+  !fs.existsSync(path.join(APP, "res", "drawable-night-land-hdpi")),
+  "Квалификаторы Android идут в порядке «ориентация, uiMode, плотность»: drawable-night-land-* недопустим"
+);
 
 read(`java/${PACKAGE.split(".").join("/")}/WidgetBridgePlugin.java`);
 read(`java/${PACKAGE.split(".").join("/")}/CalendarWidgetProvider.java`);

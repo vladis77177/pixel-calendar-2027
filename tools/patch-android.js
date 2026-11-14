@@ -166,15 +166,26 @@ const SPLASHES = [
   ["drawable-port-xxxhdpi", 1280, 1920]
 ];
 
+// Порядок квалификаторов Android фиксирован: ориентация идёт до uiMode, поэтому ночная
+// папка — drawable-land-night-hdpi, а не drawable-night-land-hdpi (иначе «Invalid resource
+// directory name»). Проверено сборкой в CI.
+function nightFolder(folder) {
+  const match = folder.match(/^drawable(?:-(land|port))?(?:-(.+))?$/);
+  if (!match) throw new Error(`Не разобрал папку splash: ${folder}`);
+  const orientation = match[1] ? `-${match[1]}` : "";
+  const density = match[2] ? `-${match[2]}` : "";
+  return `drawable${orientation}-night${density}`;
+}
+
 for (const [folder, width, height] of SPLASHES) {
   const dir = path.join(APP, "res", folder);
   fs.mkdirSync(dir, { recursive: true });
   writePng(path.join(dir, "splash.png"), width, height, drawSplash(width, height, false));
-  // Ночной вариант: то же имя ресурса в drawable-night*, Android сам выберет по uiMode.
-  // Ночная тема при запуске и есть та вспышка, из-за которой светлый фон бил по глазам.
-  const nightFolder = path.join(APP, "res", folder.replace(/^drawable/, "drawable-night"));
-  fs.mkdirSync(nightFolder, { recursive: true });
-  writePng(path.join(nightFolder, "splash.png"), width, height, drawSplash(width, height, true));
+  // Ночной вариант: то же имя ресурса в drawable-*-night, Android сам выберет по uiMode.
+  // Светлый splash в тёмной теме — та самая вспышка при запуске.
+  const nightDir = path.join(APP, "res", nightFolder(folder));
+  fs.mkdirSync(nightDir, { recursive: true });
+  writePng(path.join(nightDir, "splash.png"), width, height, drawSplash(width, height, true));
 }
 
 // 5. Manifest: widget receiver + boot permission
