@@ -8,6 +8,7 @@
   const BACKUP_STAMP_KEY = "pixel-calendar-2027-backup-at";
   const CORRUPT_KEY = "pixel-calendar-2027-corrupt";
   const BACKUP_LIMIT = 512 * 1024;
+  const CORRUPT_LIMIT = 1024 * 1024;
   const BACKUP_REFRESH_MS = 10 * 60 * 1000;
 
   let storeWasCorrupt = false;
@@ -542,7 +543,11 @@
     } catch (error) {
       storeWasCorrupt = true;
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) writeWrappedStore(CORRUPT_KEY, raw, { error: String((error && error.message) || error) });
+      // Сырую строку держим только в пределах лимита: без него квота уходит на копию
+      // повреждённого хранилища, и сохранять становится негде.
+      if (raw && raw.length <= CORRUPT_LIMIT) {
+        writeWrappedStore(CORRUPT_KEY, raw, { error: String((error && error.message) || error) });
+      }
       return normalizeStore(null);
     }
   }

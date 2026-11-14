@@ -353,8 +353,8 @@ if (keystorePropertiesFile.exists()) {
 const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8"));
 const versionName = pkg.version;
 const [major, minor, patch] = versionName.split(".").map((part) => Number(part) || 0);
-// Разряды не должны пересекаться: при схеме major*10000 + minor*100 + patch
-// версия 0.12.100 совпала бы с 0.13.0 и обновление не установилось бы.
+// Разряды не должны пересекаться: при старом major*10000 + minor*100 + patch
+// версия 0.100.0 давала тот же код, что 1.0.0 (10000), и обновление не установилось бы.
 if (minor > 999 || patch > 999) {
   throw new Error(`Версия ${versionName}: minor и patch должны быть меньше 1000, иначе versionCode пересечёт разряды`);
 }
