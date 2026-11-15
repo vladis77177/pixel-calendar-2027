@@ -38,7 +38,7 @@ function readNative(file) {
 const packageDir = path.join(APP, "java", ...PACKAGE.split("."));
 fs.mkdirSync(packageDir, { recursive: true });
 
-for (const file of ["WidgetBridgePlugin.java", "CalendarWidgetProvider.java", "MainActivity.java"]) {
+for (const file of ["WidgetBridgePlugin.java", "CalendarWidgetProvider.java", "WidgetToggleReceiver.java", "MainActivity.java"]) {
   fs.writeFileSync(path.join(packageDir, file), readNative(file));
 }
 
@@ -188,7 +188,48 @@ for (const [folder, width, height] of SPLASHES) {
   writePng(path.join(nightDir, "splash.png"), width, height, drawSplash(width, height, true));
 }
 
-// 5. Manifest: widget receiver + boot permission
+// 4b. Фон стартового окна. Тема приложения — DayNight, поэтому в тёмной теме ОС
+// Android подкладывал под окно тёмную (или белую) подложку, и при холодном старте
+// и при возврате из виджета между системным окном и уже отрисованным WebView
+// мигало чужое полотно. Подложка должна совпадать с верхом неба календаря.
+const SKY_TOP_DAY = "#82D4FB";
+const SKY_TOP_NIGHT = "#101A33";
+const VALUES = path.join(APP, "res", "values");
+const VALUES_NIGHT = path.join(APP, "res", "values-night");
+for (const [dir, color] of [[VALUES, SKY_TOP_DAY], [VALUES_NIGHT, SKY_TOP_NIGHT]]) {
+  fs.mkdirSync(dir, { recursive: true });
+  const colorsFile = path.join(dir, "colors.xml");
+  const colors = `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Подложка окна до первой отрисовки страницы: верх неба календаря. -->
+    <color name="splash_background">${color}</color>
+</resources>
+`;
+  if (!fs.existsSync(colorsFile) || fs.readFileSync(colorsFile, "utf8") !== colors) {
+    fs.writeFileSync(colorsFile, colors);
+  }
+}
+
+// 4c. Тема стартового окна: windowBackground — подложка, а не @null (иначе система
+// рисует своё полотно). Сплэш остаётся картинкой неба с травой поверх неё.
+const stylesFile = path.join(VALUES, "styles.xml");
+if (fs.existsSync(stylesFile)) {
+  let styles = fs.readFileSync(stylesFile, "utf8");
+  if (!styles.includes('name="android:windowBackground"')) {
+    styles = styles.replace(
+      /(<style name="AppTheme\.NoActionBar"[^>]*>)/,
+      `$1\n        <item name="android:windowBackground">@color/splash_background</item>`
+    );
+    styles = styles.replace(
+      /(<style name="AppTheme\.NoActionBarLaunch"[^>]*>)/,
+      `$1\n        <item name="android:windowBackground">@color/splash_background</item>`
+    );
+    fs.writeFileSync(stylesFile, styles);
+    console.log("Launch theme: window background is the sky top colour");
+  }
+}
+
+
 const manifestFile = path.join(APP, "AndroidManifest.xml");
 let manifest = fs.readFileSync(manifestFile, "utf8");
 
@@ -211,6 +252,20 @@ if (!manifest.includes("CalendarWidgetProvider")) {
         </receiver>
 `;
   manifest = manifest.replace("</application>", `${receiver}    </application>`);
+}
+
+// Тап по строке обычной задачи отмечает её без запуска приложения.
+if (!manifest.includes(".WidgetToggleReceiver")) {
+  const toggleReceiver = `
+        <receiver
+            android:name=".WidgetToggleReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="ru.pixel.calendar2027.WIDGET_TOGGLE" />
+            </intent-filter>
+        </receiver>
+`;
+  manifest = manifest.replace("</application>", `${toggleReceiver}    </application>`);
 }
 
 // Разрешения для напоминаний и виджета. Capacitor сам добавляет часть из них,

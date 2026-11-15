@@ -5,6 +5,9 @@
 
   // В Node.js (тесты) window нет, поэтому корнем может быть globalThis.
   const scope = root || (typeof globalThis !== "undefined" ? globalThis : null);
+  // Общий домен: в браузере его даёт core.js, в тестах — require.
+  const core = (scope && scope.PixelCore)
+    || (typeof module !== "undefined" && module.exports ? require("./core.js") : null);
   const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
   const ISO_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
   // Насколько вперёд планируем повторы: чаще приложение открывают, но и без
@@ -14,6 +17,8 @@
   // может быть и через несколько лет (29 февраля), но терять его нельзя.
   const MAX_LOOKAHEAD_DAYS = 1500;
   const MAX_NOTIFICATIONS = 250;
+  // Верхняя граница числового id: int32 в Android, с запасом под 250 напоминаний.
+  const MAX_NOTIFICATION_ID = 2000000000;
   const ACTION_TYPE_ID = "calendar-task";
   const ACTION_DONE = "done";
   const ACTION_SNOOZE = "snooze";
@@ -75,7 +80,53 @@
     for (let i = 0; i < text.length; i += 1) {
       hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
     }
-    return (hash % 2000000000) + 1;
+    return (hash % MAX_NOTIFICATION_ID) + 1;
+  }
+
+  // Ключ напоминания уникален: id задачи повторяется на разных датах, а у серии
+  // напоминание своё на каждый день, поэтому в ключ входят и дата, и вид.
+  function taskKey(taskId, iso) {
+    return `task:${taskId}@${iso}`;
+  }
+
+  function seriesKey(seriesId, iso) {
+    return `series:${seriesId}@${iso}`;
+  }
+
+  function digestKey(iso) {
+    return `digest@${iso}`;
+  }
+
+  // Разводит совпавшие хеши внутри одного планирования: ключи сортируются, так
+  // что результат не зависит от порядка вставки и повторяется после перезапуска.
+  function assignNotificationIds(keys) {
+    const used = new Set();
+    const ids = new Map();
+    [...new Set(keys.map((key) => String(key)))].sort().forEach((key) => {
+      let id = notificationId(key);
+      while (used.has(id)) id = (id % MAX_NOTIFICATION_ID) + 1;
+      used.add(id);
+      ids.set(key, id);
+    });
+    return ids;
+  }
+
+  // Map<ключ, напоминание> → Map<id, напоминание> без повторов id.
+  function withIds(entries) {
+    const ids = assignNotificationIds([...entries.keys()]);
+    const result = new Map();
+    entries.forEach((item, key) => {
+      result.set(ids.get(key), { ...item, key });
+    });
+    return result;
+  }
+
+  function mergePlans(plans) {
+    const entries = new Map();
+    plans.forEach((plan) => plan.forEach((item) => {
+      entries.set(item.key, item);
+    }));
+    return withIds(entries);
   }
 
   function whenFor(iso, time) {
@@ -85,13 +136,11 @@
   }
 
   function isoOf(date) {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    return core.toISO(date);
   }
 
   function addDays(iso, days) {
-    const date = new Date(`${iso}T12:00:00`);
-    date.setDate(date.getDate() + days);
-    return isoOf(date);
+    return core.addDaysIso(iso, days);
   }
 
   function leadLabel(minutes) {
@@ -117,25 +166,7 @@
   // Должно совпадать с isSeriesActiveOn в app.js: одна серия не должна
   // напоминать в день, который календарь не показывает.
   function seriesActiveOn(series, iso) {
-    if (!series || series.deletedAt || !ISO_PATTERN.test(iso) || !ISO_PATTERN.test(series.start || "")) {
-      return false;
-    }
-    if (iso < series.start) return false;
-    if (series.end && iso > series.end) return false;
-    const exception = series.exceptions && series.exceptions[iso];
-    if (exception && exception.deleted) return false;
-    const date = new Date(`${iso}T12:00:00`);
-    const start = new Date(`${series.start}T12:00:00`);
-    const diff = Math.round((date - start) / 86400000);
-    if (diff < 0) return false;
-    if (series.freq === "daily") return true;
-    if (series.freq === "weekdays") return date.getDay() >= 1 && date.getDay() <= 5;
-    if (series.freq === "weekly") return diff % 7 === 0 && date.getDay() === start.getDay();
-    if (series.freq === "monthly") return date.getDate() === start.getDate();
-    if (series.freq === "yearly") {
-      return date.getMonth() === start.getMonth() && date.getDate() === start.getDate();
-    }
-    return false;
+    return core.isSeriesActiveOn(series, iso);
   }
 
   // Разворачивает серию: все вхождения на 60 дней вперёд плюс ближайшее
@@ -231,7 +262,7 @@
           at = shiftByLead(at, task.leadMinutes, floor);
         }
         if (!at || at.getTime() <= floor) return;
-        wanted.set(notificationId(task.id), {
+        wanted.set(taskKey(task.id, iso), {
           at,
           text: isSnoozed ? reminderBody(task.text, task.time, 0, true) : reminderBody(task.text, task.time, task.leadMinutes, false),
           taskId: task.id,
@@ -243,7 +274,7 @@
 
     (Array.isArray(series) ? series : []).forEach((item) => {
       seriesCandidates(item, current, floor).forEach(({ iso, at, snoozed }) => {
-        wanted.set(notificationId(`${item.id}@${iso}`), {
+        wanted.set(seriesKey(item.id, iso), {
           at,
           text: reminderBody(item.text, item.time, snoozed ? 0 : item.leadMinutes, snoozed),
           taskId: null,
@@ -253,16 +284,11 @@
       });
     });
 
-    return limitReminders(wanted);
+    return limitReminders(withIds(wanted));
   }
 
   function plural(n, one, few, many) {
-    const tail = n % 100;
-    if (tail >= 11 && tail <= 14) return many;
-    const last = n % 10;
-    if (last === 1) return one;
-    if (last >= 2 && last <= 4) return few;
-    return many;
+    return core.plural(n, one, few, many);
   }
 
   // Состав сводки на конкретный день: активные задачи и вхождения серий.
@@ -304,7 +330,7 @@
       if (!at || at.getTime() <= floor) continue;
       const text = digestBody(tasks, series, iso);
       if (!text) continue;
-      result.set(notificationId(`digest@${iso}`), {
+      result.set(digestKey(iso), {
         at,
         text,
         title: "Утренняя сводка",
@@ -314,7 +340,16 @@
         date: iso
       });
     }
-    return result;
+    return withIds(result);
+  }
+
+  // Всё, что планируется на один момент: задачи, серии и утренняя сводка.
+  function collectAll(tasks, series, now, settings) {
+    const wanted = mergePlans([
+      collectReminders(tasks, series, now),
+      collectDigest(tasks, series, now, settings)
+    ]);
+    return wanted.size > MAX_NOTIFICATIONS ? limitReminders(wanted) : wanted;
   }
 
   async function ensurePermission() {
@@ -328,10 +363,29 @@
     }
   }
 
+  // Что запланировано по каждой задаче и серии: ключ включает дату, а cancel и
+  // кнопки в уведомлении знают только саму сущность.
+  let plannedIds = new Map();
+
+  function rememberPlanned(wanted) {
+    const next = new Map();
+    wanted.forEach((item, id) => {
+      [item.taskId, item.seriesId].forEach((owner) => {
+        if (!owner) return;
+        const key = String(owner);
+        if (!next.has(key)) next.set(key, []);
+        next.get(key).push(id);
+      });
+    });
+    plannedIds = next;
+  }
+
   async function cancel(taskId) {
     if (!isNative() || !plugin() || !taskId) return;
+    const ids = plannedIds.get(String(taskId)) || [];
+    if (!ids.length) return;
     try {
-      await plugin().cancel({ notifications: [{ id: notificationId(taskId) }] });
+      await plugin().cancel({ notifications: ids.map((id) => ({ id })) });
     } catch (error) {
       // отменять нечего
     }
@@ -350,10 +404,8 @@
       pending = [];
     }
 
-    const wanted = collectReminders(tasks, series);
-    collectDigest(tasks, series, new Date(), settings).forEach((item, id) => {
-      wanted.set(id, item);
-    });
+    const wanted = collectAll(tasks, series, new Date(), settings);
+    rememberPlanned(wanted);
     const stale = pending.filter((item) => !wanted.has(item.id)).map((item) => ({ id: item.id }));
     if (stale.length) {
       try {
@@ -417,8 +469,13 @@
     SERIES_HORIZON_DAYS,
     MAX_LOOKAHEAD_DAYS,
     MAX_NOTIFICATIONS,
+    MAX_NOTIFICATION_ID,
     isNative,
     notificationId,
+    taskKey,
+    seriesKey,
+    digestKey,
+    assignNotificationIds,
     whenFor,
     seriesActiveOn,
     seriesCandidates,
@@ -426,6 +483,7 @@
     addActionListener,
     collectReminders,
     collectDigest,
+    collectAll,
     digestTime,
     ensurePermission,
     cancel,

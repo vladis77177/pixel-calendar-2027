@@ -8,7 +8,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const os = require("node:os");
 const crypto = require("node:crypto");
-const { mergeStates, migrateState } = require("../sync.js");
+const { mergeStates, migrateState, pruneTombstones } = require("../sync.js");
 
 const ROOT = path.resolve(__dirname, "..");
 const WWW = path.join(ROOT, "www");
@@ -23,6 +23,36 @@ const TOKEN_FILE = path.join(DATA_DIR, "token.txt");
 const PORT = Number(process.env.PORT) || 8787;
 const HOST = process.env.HOST || "0.0.0.0";
 const MAX_BODY = 2 * 1024 * 1024;
+
+// LWW идёт по клиентским часам, поэтому сбитое время на телефоне перезаписывало бы
+// свежие правки с ПК. Отметки «из будущего» больше чем на 5 минут подрезаем до now.
+const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
+
+function timeMs(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+// Возвращает { state, cut }: сколько отметок подрезано — чтобы это было видно в консоли.
+function clampFutureState(state, now) {
+  const limit = now + MAX_FUTURE_SKEW_MS;
+  let cut = 0;
+  const fix = (item) => {
+    if (item && timeMs(item.updatedAt) > limit) {
+      item.updatedAt = Math.floor(now);
+      cut += 1;
+    }
+  };
+  if (!state || typeof state !== "object") return { state, cut: 0 };
+  if (state.tasks && typeof state.tasks === "object") {
+    Object.keys(state.tasks).forEach((iso) => {
+      if (Array.isArray(state.tasks[iso])) state.tasks[iso].forEach(fix);
+    });
+  }
+  if (Array.isArray(state.series)) state.series.forEach(fix);
+  fix(state.settings);
+  return { state, cut };
+}
+// clampFutureState меняет переданный объект на месте: вызывающий уже держит свежую копию.
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -138,6 +168,8 @@ function rotateBackup() {
 
 function persist(next) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+  const pruned = pruneTombstones(next, Date.now());
+  if (pruned > 0) console.log(`Синхронизация: убрано ${pruned} старых могил`);
   try {
     rotateBackup();
   } catch (error) {
@@ -171,7 +203,7 @@ function applyCors(req, res) {
   if (!allowed) return;
   res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Vary", "Origin");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Sync-Token");
   res.setHeader("Access-Control-Max-Age", "600");
 }
@@ -220,6 +252,19 @@ function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "DELETE") {
+    // Полное стирание серверной копии: клиент удаляет данные и у себя.
+    try {
+      persist(migrateState({}));
+    } catch (writeError) {
+      console.error("Не удалось сохранить состояние:", writeError.message);
+      sendJson(res, 500, { error: "Не удалось сохранить состояние" });
+      return;
+    }
+    sendJson(res, 200, publicState());
+    return;
+  }
+
   if (req.method !== "POST") {
     sendJson(res, 405, { error: "Метод не поддерживается" });
     return;
@@ -237,7 +282,11 @@ function handleApi(req, res) {
       sendJson(res, 400, { error: "Некорректный JSON" });
       return;
     }
-    const merged = mergeStates(serverState, incoming);
+    const clamped = clampFutureState(incoming, Date.now());
+    if (clamped.cut > 0) {
+      console.warn(`Синхронизация: подрезано ${clamped.cut} отметок времени из будущего`);
+    }
+    const merged = mergeStates(serverState, clamped.state);
     try {
       persist(merged);
     } catch (writeError) {

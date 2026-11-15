@@ -6,7 +6,7 @@ test("id уведомления стабилен и попадает в диап
   const first = notify.notificationId("task-123");
   assert.equal(first, notify.notificationId("task-123"));
   assert.notEqual(first, notify.notificationId("task-124"));
-  assert.ok(first >= 1 && first <= 2000000000);
+  assert.ok(first >= 1 && first <= notify.MAX_NOTIFICATION_ID);
   assert.equal(notify.notificationId(""), 1);
 });
 
@@ -63,20 +63,20 @@ test("обычные задачи и серии дают будущие напо
 
   const map = notify.collectReminders(tasks, series, now);
   assert.equal(map.size, 6);
-  assert.ok(map.has(notify.notificationId("t1")));
-  assert.equal(map.has(notify.notificationId("t2")), false);
-  assert.equal(map.has(notify.notificationId("t3")), false);
+  assert.ok(map.has(notify.notificationId(notify.taskKey("t1", "2027-01-04"))));
+  assert.equal(map.has(notify.notificationId(notify.taskKey("t2", "2027-01-04"))), false);
+  assert.equal(map.has(notify.notificationId(notify.taskKey("t3", "2027-01-04"))), false);
 
-  const first = map.get(notify.notificationId("s1@2027-01-04"));
+  const first = map.get(notify.notificationId(notify.seriesKey("s1", "2027-01-04")));
   assert.equal(first.seriesId, "s1");
   assert.equal(first.text, "Полить цветы");
   assert.equal(first.date, "2027-01-04");
   assert.equal(first.at.getHours(), 9);
   assert.equal(first.at.getMinutes(), 30);
-  assert.equal(map.has(notify.notificationId("s1@2027-01-05")), false);
-  assert.equal(map.has(notify.notificationId("s1@2027-01-06")), false);
-  assert.equal(map.has(notify.notificationId("s1@2027-01-10")), true);
-  assert.equal(map.has(notify.notificationId("s2@2027-01-04")), false);
+  assert.equal(map.has(notify.notificationId(notify.seriesKey("s1", "2027-01-05"))), false);
+  assert.equal(map.has(notify.notificationId(notify.seriesKey("s1", "2027-01-06"))), false);
+  assert.equal(map.has(notify.notificationId(notify.seriesKey("s1", "2027-01-10"))), true);
+  assert.equal(map.has(notify.notificationId(notify.seriesKey("s2", "2027-01-04"))), false);
 });
 
 test("планировщик отправляет серии в плагин и убирает лишние", async () => {
@@ -144,7 +144,7 @@ test("годовая серия получает напоминание за п�
   }], now);
 
   assert.equal(map.size, 1);
-  const item = map.get(notify.notificationId("s1@2027-06-01"));
+  const item = map.get(notify.notificationId(notify.seriesKey("s1", "2027-06-01")));
   assert.ok(item, "годовое напоминание должно планироваться заранее");
   assert.equal(item.at.getFullYear(), 2027);
   assert.equal(item.at.getMonth(), 5);
@@ -165,9 +165,9 @@ test("дневная серия планирует окно и одно вхож
   }], now);
 
   assert.equal(map.size, notify.SERIES_HORIZON_DAYS + 2);
-  assert.ok(map.has(notify.notificationId("s1@2026-11-11")));
-  assert.ok(map.has(notify.notificationId("s1@2027-01-10")));
-  assert.ok(map.has(notify.notificationId("s1@2027-01-11")), "ближайшее вхождение за окном");
+  assert.ok(map.has(notify.notificationId(notify.seriesKey("s1", "2026-11-11"))));
+  assert.ok(map.has(notify.notificationId(notify.seriesKey("s1", "2027-01-10"))));
+  assert.ok(map.has(notify.notificationId(notify.seriesKey("s1", "2027-01-11"))), "ближайшее вхождение за окном");
 });
 
 test("при переполнении у каждой серии остаётся напоминание", () => {
@@ -198,7 +198,7 @@ test("отложенная задача сдвигает напоминание"
   const map = notify.collectReminders({
     "2026-11-11": [{ id: "t1", text: "Позвонить", time: "09:30", snoozedUntil: until }]
   }, [], now);
-  const item = map.get(notify.notificationId("t1"));
+  const item = map.get(notify.notificationId(notify.taskKey("t1", "2026-11-11")));
   assert.ok(item);
   assert.equal(item.at.getTime(), until);
 });
@@ -216,7 +216,7 @@ test("отложенный день серии сдвигает напомина
     deletedAt: null,
     exceptions: { "2026-11-11": { snoozedUntil: until, updatedAt: 1 } }
   }], now);
-  const item = map.get(notify.notificationId("s1@2026-11-11"));
+  const item = map.get(notify.notificationId(notify.seriesKey("s1", "2026-11-11")));
   assert.ok(item);
   assert.equal(item.at.getTime(), until);
 });
@@ -240,7 +240,7 @@ test("заранее сдвигает напоминание и называет
     "2026-11-11": [{ id: "t1", text: "Позвонить", time: "10:00", leadMinutes: 10 }]
   }, [], now);
 
-  const item = map.get(notify.notificationId("t1"));
+  const item = map.get(notify.notificationId(notify.taskKey("t1", "2026-11-11")));
   assert.ok(item);
   assert.equal(item.at.getHours(), 9);
   assert.equal(item.at.getMinutes(), 50);
@@ -253,7 +253,7 @@ test("если заранее уже прошло, напоминаем в ср�
     "2026-11-11": [{ id: "t1", text: "Позвонить", time: "10:00", leadMinutes: 10 }]
   }, [], now);
 
-  const item = map.get(notify.notificationId("t1"));
+  const item = map.get(notify.notificationId(notify.taskKey("t1", "2026-11-11")));
   assert.ok(item);
   assert.equal(item.at.getHours(), 10);
   assert.equal(item.at.getMinutes(), 0);
@@ -272,7 +272,7 @@ test("отложенное важнее заблаговременного на�
     }]
   }, [], now);
 
-  const item = map.get(notify.notificationId("t1"));
+  const item = map.get(notify.notificationId(notify.taskKey("t1", "2026-11-11")));
   assert.ok(item);
   assert.equal(item.at.getTime(), until);
   assert.equal(item.text, "Отложено · 09:30 Позвонить");
@@ -292,7 +292,7 @@ test("серия напоминает заранее в каждый подхо�
     exceptions: {}
   }], now);
 
-  const item = map.get(notify.notificationId("s1@2026-11-11"));
+  const item = map.get(notify.notificationId(notify.seriesKey("s1", "2026-11-11")));
   assert.ok(item);
   assert.equal(item.at.getHours(), 8);
   assert.equal(item.at.getMinutes(), 30);
@@ -341,4 +341,123 @@ test("время сводки берётся из настроек, мусор �
   assert.equal(notify.digestTime({ digestTime: 730 }), "08:00");
   assert.equal(notify.digestTime({}), "08:00");
   assert.equal(notify.digestTime(null), "08:00");
+});
+
+test("200 разных ключей дают 200 разных id в диапазоне Android", () => {
+  const keys = Array.from({ length: 200 }, (_, index) => notify.taskKey(`task-${index}`, "2027-01-05"));
+  const ids = notify.assignNotificationIds(keys);
+  assert.equal(ids.size, 200);
+  const values = [...ids.values()];
+  assert.equal(new Set(values).size, 200);
+  values.forEach((id) => {
+    assert.ok(Number.isInteger(id) && id >= 1 && id <= notify.MAX_NOTIFICATION_ID);
+  });
+});
+
+test("id стабильны между прогонами и не зависят от порядка ключей", () => {
+  const keys = Array.from({ length: 120 }, (_, index) => `task:task-${index}@2027-02-0${index % 9}`);
+  const first = notify.assignNotificationIds(keys);
+  const again = notify.assignNotificationIds(keys);
+  const reversed = notify.assignNotificationIds([...keys].reverse());
+  keys.forEach((key) => {
+    assert.equal(again.get(key), first.get(key));
+    assert.equal(reversed.get(key), first.get(key));
+  });
+});
+
+test("совпавший хеш разводится до свободного id", () => {
+  const first = "t2h3px9un9";
+  const second = "tn3fxhni";
+  assert.equal(notify.notificationId(first), notify.notificationId(second));
+  const ids = notify.assignNotificationIds([second, first]);
+  assert.equal(ids.get(first), notify.notificationId(first));
+  assert.equal(ids.get(second), notify.notificationId(first) + 1);
+});
+
+test("повтор id задачи на разных датах даёт разные уведомления", () => {
+  const now = new Date(2026, 10, 11, 8, 0, 0);
+  const map = notify.collectReminders({
+    "2026-11-11": [{ id: "t1", text: "Позвонить", time: "10:00" }],
+    "2026-11-12": [{ id: "t1", text: "Позвонить", time: "10:00" }]
+  }, [], now);
+
+  assert.equal(map.size, 2);
+  const firstId = notify.notificationId(notify.taskKey("t1", "2026-11-11"));
+  const secondId = notify.notificationId(notify.taskKey("t1", "2026-11-12"));
+  assert.notEqual(firstId, secondId);
+  assert.equal(map.get(firstId).date, "2026-11-11");
+  assert.equal(map.get(secondId).date, "2026-11-12");
+});
+
+test("серия и задача с одним id в один день не затирают друг друга", () => {
+  const now = new Date(2026, 10, 11, 8, 0, 0);
+  const map = notify.collectAll({
+    "2026-11-11": [{ id: "s1", text: "Позвонить", time: "09:30" }]
+  }, [{
+    id: "s1",
+    text: "Зарядка",
+    freq: "daily",
+    start: "2026-11-11",
+    end: "2026-11-11",
+    time: "09:30",
+    deletedAt: null,
+    exceptions: {}
+  }], now, null);
+
+  const idOf = (key) => [...map.entries()].find(([, item]) => item.key === key)[0];
+  const taskId = idOf(notify.taskKey("s1", "2026-11-11"));
+  const occurrenceId = idOf(notify.seriesKey("s1", "2026-11-11"));
+  assert.notEqual(taskId, occurrenceId);
+  assert.equal(map.get(taskId).text, "Позвонить");
+  assert.equal(map.get(occurrenceId).text, "Зарядка");
+});
+
+test("сводка и задача в 08:00 получают разные id", () => {
+  const now = new Date(2026, 10, 11, 7, 0, 0);
+  const map = notify.collectAll(
+    { "2026-11-11": [{ id: "t1", text: "Позвонить", time: "08:00" }] },
+    [],
+    now,
+    { morningDigest: true }
+  );
+
+  const idOf = (key) => [...map.entries()].find(([, item]) => item.key === key)[0];
+  const taskId = idOf(notify.taskKey("t1", "2026-11-11"));
+  const digestId = idOf(notify.digestKey("2026-11-11"));
+  assert.notEqual(taskId, digestId);
+  assert.equal(map.get(taskId).at.getHours(), 8);
+  assert.equal(map.get(digestId).at.getHours(), 8);
+  assert.equal(map.get(digestId).digest, true);
+});
+
+test("cancel снимает id, который запланировал планировщик", async () => {
+  const today = new Date();
+  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  const iso = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+  const scheduled = [];
+  const cancelled = [];
+  globalThis.Capacitor = {
+    isNativePlatform: () => true,
+    Plugins: {
+      LocalNotifications: {
+        getPending: async () => ({ notifications: [] }),
+        cancel: async (payload) => { cancelled.push(...payload.notifications); },
+        checkPermissions: async () => ({ display: "granted" }),
+        registerActionTypes: async () => {},
+        schedule: async (payload) => { scheduled.push(...payload.notifications); }
+      }
+    }
+  };
+
+  try {
+    await notify.resyncAll({ [iso]: [{ id: "t1", text: "Позвонить", time: "00:01" }] }, []);
+    const planned = scheduled.filter((item) => item.extra.taskId === "t1");
+    assert.equal(planned.length, 1);
+    assert.equal(planned[0].id, notify.notificationId(notify.taskKey("t1", iso)));
+
+    await notify.cancel("t1");
+    assert.ok(cancelled.some((item) => item.id === planned[0].id));
+  } finally {
+    delete globalThis.Capacitor;
+  }
 });

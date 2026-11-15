@@ -9,7 +9,7 @@
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone"],
   "orientation": "any",
-  "background_color": "#e9ffd6",
+  "background_color": "#82d4fb",
   "theme_color": "#8bd8ff",
   "categories": ["productivity", "lifestyle"],
   "icons": [

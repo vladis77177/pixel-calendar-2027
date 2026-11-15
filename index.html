@@ -641,6 +641,7 @@
             </button>
           </div>
           <p class="settings-note sync-status" id="syncStatus" data-state="idle">Не подключено</p>
+          <p class="settings-note sync-size">Занято в синхронизации: <span id="syncSize">≈ 0 КБ</span></p>
           <details class="sync-help">
             <summary>Как подключить</summary>
             <ol>
@@ -673,10 +674,17 @@
         <section class="settings-section settings-danger">
           <h4 class="settings-title">Очистить данные</h4>
           <p class="settings-note">Удаляет все дела и повторяющиеся серии из этого браузера. Отменить это действие нельзя.</p>
-          <button class="pixel-btn danger-btn" id="clearDataBtn" type="button">
-            <svg class="icon"><use href="#i-trash"></use></svg>
-            <span>Удалить все задачи</span>
-          </button>
+          <div class="settings-actions">
+            <button class="pixel-btn danger-btn" id="clearDataBtn" type="button">
+              <svg class="icon"><use href="#i-trash"></use></svg>
+              <span>Удалить все задачи</span>
+            </button>
+            <button class="pixel-btn danger-btn" id="wipeDataBtn" type="button">
+              <svg class="icon"><use href="#i-trash"></use></svg>
+              <span>Стереть безвозвратно</span>
+            </button>
+          </div>
+          <p class="settings-note">Безвозвратное стирание убирает и следы удаления, и копии в этом браузере, а при настроенной синхронизации — и серверную копию. Спрашивает подтверждение дважды.</p>
         </section>
 
         <p class="settings-meta" id="settingsMeta">0 задач · 0 серий</p>
@@ -730,6 +738,7 @@
     <p class="empty-note">Добавь первое дело — и день сразу станет чуточку интереснее.</p>
   </template>
 
+  <script src="core.js" defer></script>
   <script src="update.js" defer></script>
   <script src="sync.js" defer></script>
   <script src="series-stats.js" defer></script>

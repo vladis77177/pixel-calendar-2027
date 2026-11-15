@@ -4,11 +4,13 @@ on:
   workflow_dispatch:
   push:
     branches: [main, master]
+    tags: ["v*"]
     paths:
       - "index.html"
       - "styles.css"
       - "app.mobile.css"
       - "app.js"
+      - "core.js"
       - "update.js"
       - "series-stats.js"
       - "widget.html"
@@ -36,6 +38,9 @@ jobs:
   build:
     name: Build debug APK
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -136,10 +141,14 @@ jobs:
         run: |
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort | tail -1)"
           AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt2 -type f | sort | tail -1)"
+          : > apk-fingerprints.txt
           for apk in pixel-calendar-2027-debug.apk pixel-calendar-2027-release.apk; do
             [ -f "$apk" ] || continue
             echo "== $apk =="
-            [ -n "$APKSIGNER" ] && "$APKSIGNER" verify --print-certs "$apk" || true
+            if [ -n "$APKSIGNER" ]; then
+              "$APKSIGNER" verify --print-certs "$apk" || true
+              "$APKSIGNER" verify --print-certs "$apk" | sed -n "s/^Signer #1 certificate SHA-256 digest: //p" | head -1 | sed "s|^|$apk: |" >> apk-fingerprints.txt
+            fi
             if [ -n "$AAPT" ]; then
               "$AAPT" dump badging "$apk" | grep -E "^package:" || true
               "$AAPT" dump xmltree --file AndroidManifest.xml "$apk" | grep -i "debuggable" || echo "debuggable=true (не задан)"
@@ -162,3 +171,42 @@ jobs:
           path: pixel-calendar-2027-release.apk
           if-no-files-found: warn
           retention-days: 90
+
+      - name: Publish GitHub release
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_APK=pixel-calendar-2027-release.apk
+          DEBUG_APK=pixel-calendar-2027-debug.apk
+          if [ ! -f "$RELEASE_APK" ]; then
+            echo "::warning::Release APK is missing (signing secrets not set) — tag $GITHUB_REF_NAME is not published."
+            exit 0
+          fi
+          VERSION="$(node -p "require('./package.json').version")"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt2 -type f | sort | tail -1)"
+          VERSION_CODE="$("$AAPT" dump badging "$RELEASE_APK" | sed -n "s/^package:.*versionCode='\([0-9]*\)'.*/\1/p" | head -1)"
+          FINGERPRINT="$(sed -n "s|^$RELEASE_APK: ||p" apk-fingerprints.txt | head -1)"
+          {
+            echo "**Version:** $VERSION (\`$GITHUB_REF_NAME\`)"
+            echo
+            echo "**versionCode:** ${VERSION_CODE:-unknown}"
+            echo
+            echo "**Signing certificate (SHA-256):** \`${FINGERPRINT:-unknown}\`"
+            echo
+            echo "| file | size | sha256 |"
+            echo "| --- | --- | --- |"
+            for apk in "$RELEASE_APK" "$DEBUG_APK"; do
+              [ -f "$apk" ] || continue
+              echo "| \`$apk\` | $(du -h "$apk" | cut -f1) | \`$(sha256sum "$apk" | cut -d' ' -f1)\` |"
+            done
+          } > release-notes.md
+          cat release-notes.md
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$RELEASE_APK" "$DEBUG_APK" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$RELEASE_APK" "$DEBUG_APK" \
+              --verify-tag --latest \
+              --title "v$VERSION — Pixel Calendar 2027" \
+              --notes-file release-notes.md
+          fi

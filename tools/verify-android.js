@@ -62,6 +62,29 @@ check(
   "Квалификаторы Android идут в порядке «ориентация, uiMode, плотность»: drawable-night-land-* недопустим"
 );
 
+// Подложка стартового окна: без неё Android рисует под WebView своё полотно и при
+// холодном старте или возврате из виджета видно вспышку чужого цвета.
+const styles = read("res/values/styles.xml");
+const stylesNight = fs.existsSync(path.join(APP, "res", "values-night", "styles.xml"))
+  ? read("res/values-night/styles.xml")
+  : "";
+check(
+  /AppTheme\.NoActionBar[^>]*>[\s\S]*android:windowBackground/.test(styles),
+  "AppTheme.NoActionBar must set android:windowBackground"
+);
+check(
+  /AppTheme\.NoActionBarLaunch[^>]*>[\s\S]*android:windowBackground/.test(styles)
+    || /AppTheme\.NoActionBarLaunch[^>]*>[\s\S]*android:windowBackground/.test(stylesNight),
+  "Launch theme must set android:windowBackground instead of @null"
+);
+const dayColors = read("res/values/colors.xml");
+if (dayColors) {
+  check(
+    /name="splash_background">#82D4FB</.test(dayColors),
+    "Day splash background must be the sky top colour #82D4FB"
+  );
+}
+
 read(`java/${PACKAGE.split(".").join("/")}/WidgetBridgePlugin.java`);
 read(`java/${PACKAGE.split(".").join("/")}/CalendarWidgetProvider.java`);
 read("res/layout/calendar_widget.xml");
@@ -77,6 +100,38 @@ read("res/drawable/widget_task_bg_night.xml");
 read("res/drawable/widget_progress.xml");
 read("res/drawable/widget_progress_night.xml");
 read("res/xml/calendar_widget_info.xml");
+
+const receiver = read(`java/${PACKAGE.split(".").join("/")}/WidgetToggleReceiver.java`);
+check(
+  /android:name="\.WidgetToggleReceiver"[^>]*android:exported="false"/s.test(manifest)
+    || /android:exported="false"[^>]*android:name="\.WidgetToggleReceiver"/s.test(manifest),
+  "WidgetToggleReceiver must be declared with exported=\"false\""
+);
+check(
+  manifest.includes("ru.pixel.calendar2027.WIDGET_TOGGLE"),
+  "WidgetToggleReceiver intent-filter action is missing"
+);
+check(
+  manifest.includes("android:name=\"ru.pixel.calendar2027.WIDGET_TOGGLE\""),
+  "WidgetToggleReceiver action must match ru.pixel.calendar2027.WIDGET_TOGGLE"
+);
+check(
+  receiver.includes("ru.pixel.calendar2027.WIDGET_TOGGLE"),
+  "WidgetToggleReceiver must handle action ru.pixel.calendar2027.WIDGET_TOGGLE"
+);
+check(
+  !receiver.includes("MainActivity") && !receiver.includes("startActivity"),
+  "WidgetToggleReceiver must not open MainActivity"
+);
+const bridge = read(`java/${PACKAGE.split(".").join("/")}/WidgetBridgePlugin.java`);
+check(bridge.includes("consumeToggles"), "WidgetBridgePlugin must expose consumeToggles");
+
+const appJs = fs.readFileSync(path.join(ROOT, "app.js"), "utf8");
+const payloadStart = appJs.indexOf("function buildWidgetPayload");
+const payloadEnd = appJs.indexOf("function nativeWidgetPlugin");
+const payloadBody = payloadStart >= 0 && payloadEnd > payloadStart ? appJs.slice(payloadStart, payloadEnd) : "";
+check(payloadBody.includes("key:"), "syncNativeWidget payload must include key");
+check(payloadBody.includes("iso,") || payloadBody.includes("iso:"), "syncNativeWidget payload must include iso");
 
 const widgetFont = path.join(APP, "res", "font", "tiny5.ttf");
 check(fs.existsSync(widgetFont), "Missing widget font res/font/tiny5.ttf");

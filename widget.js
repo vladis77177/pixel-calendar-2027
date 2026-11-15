@@ -58,18 +58,15 @@
   }
 
   function toISO(date) {
-    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+    return window.PixelCore.toISO(date);
   }
 
   function fromISO(iso) {
-    const parts = String(iso).split("-").map(Number);
-    return new Date(parts[0], parts[1] - 1, parts[2]);
+    return window.PixelCore.fromISO(iso);
   }
 
   function isValidISO(iso) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso))) return false;
-    const date = fromISO(iso);
-    return !Number.isNaN(date.getTime()) && toISO(date) === iso;
+    return window.PixelCore.isValidISO(iso);
   }
 
   function makeId() {
@@ -218,20 +215,7 @@
   }
 
   function isSeriesActiveOn(series, iso) {
-    if (!series || !isValidISO(iso)) return false;
-    if (iso < series.start) return false;
-    if (series.end && iso > series.end) return false;
-    const exception = series.exceptions && series.exceptions[iso];
-    if (exception && exception.deleted) return false;
-    const date = fromISO(iso);
-    const start = fromISO(series.start);
-    const diff = Math.round((date - start) / 86400000);
-    if (diff < 0) return false;
-    if (series.freq === "daily") return true;
-    if (series.freq === "weekdays") return date.getDay() >= 1 && date.getDay() <= 5;
-    if (series.freq === "weekly") return diff % 7 === 0 && date.getDay() === start.getDay();
-    if (series.freq === "monthly") return date.getDate() === start.getDate();
-    return false;
+    return window.PixelCore.isSeriesActiveOn(series, iso);
   }
 
   function getEntries(iso) {

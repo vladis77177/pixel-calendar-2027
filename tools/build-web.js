@@ -10,6 +10,7 @@ const FILES = [
   "index.html",
   "styles.css",
   "app.mobile.css",
+  "core.js",
   "app.js",
   "update.js",
   "sync.js",

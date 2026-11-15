@@ -65,6 +65,7 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
         String holiday = "";
         String phase = "day";
         String sky = "auto";
+        String iso = "";
         int done = 0;
         int total = 0;
         JSONArray tasks = new JSONArray();
@@ -76,6 +77,7 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
             holiday = payload.optString("holiday", "");
             phase = payload.optString("phase", "day");
             sky = payload.optString("sky", "auto");
+            iso = payload.optString("iso", "");
             done = payload.optInt("done", 0);
             total = payload.optInt("total", 0);
             tasks = payload.optJSONArray("tasks");
@@ -120,6 +122,24 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
                 row.setTextColor(R.id.widget_task_mark, night ? 0xFF6D7C99 : 0xFF9A8B74);
                 row.setTextColor(R.id.widget_task_text, night ? 0xFF8E9AB5 : 0xFF8E7F6A);
             }
+
+            // Обычные задачи отмечаются прямо из виджета; строкам серий нужна
+            // «исключение» на стороне JS, поэтому обработчик им не ставим.
+            String key = task.optString("key", "");
+            if (key.startsWith("task:")) {
+                Intent toggleIntent = new Intent(context, WidgetToggleReceiver.class);
+                toggleIntent.setAction(WidgetToggleReceiver.ACTION_TOGGLE);
+                toggleIntent.putExtra(WidgetToggleReceiver.EXTRA_KEY, key);
+                toggleIntent.putExtra(WidgetToggleReceiver.EXTRA_ISO, iso);
+                PendingIntent togglePending = PendingIntent.getBroadcast(
+                        context,
+                        widgetId * 10 + index,
+                        toggleIntent,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                );
+                row.setOnClickPendingIntent(R.id.widget_task_row, togglePending);
+            }
+
             views.addView(R.id.widget_tasks_list, row);
         }
 

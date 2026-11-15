@@ -170,6 +170,7 @@
     importFile: document.getElementById("importFile"),
     exportIcsBtn: document.getElementById("exportIcsBtn"),
     clearDataBtn: document.getElementById("clearDataBtn"),
+    wipeDataBtn: document.getElementById("wipeDataBtn"),
     installBtn: document.getElementById("installBtn"),
     installNote: document.getElementById("installNote"),
     settingsMeta: document.getElementById("settingsMeta"),
@@ -181,6 +182,7 @@
     syncConnectBtn: document.getElementById("syncConnectBtn"),
     syncNowBtn: document.getElementById("syncNowBtn"),
     syncStatus: document.getElementById("syncStatus"),
+    syncSize: document.getElementById("syncSize"),
     toast: document.getElementById("toast"),
     toastText: document.getElementById("toastText"),
     updateBar: document.getElementById("updateBar"),
@@ -201,6 +203,8 @@
 
   let settingsFingerprint = "";
   let applyingRemote = false;
+  // Собранные дела дня: пересобираем только после изменения состояния.
+  const entriesCache = new Map();
 
   const state = {
     view: stored.view,
@@ -239,18 +243,15 @@
   }
 
   function toISO(date) {
-    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+    return window.PixelCore.toISO(date);
   }
 
   function fromISO(iso) {
-    const parts = String(iso).split("-").map(Number);
-    return new Date(parts[0], parts[1] - 1, parts[2]);
+    return window.PixelCore.fromISO(iso);
   }
 
   function isValidISO(iso) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso))) return false;
-    const date = fromISO(iso);
-    return !Number.isNaN(date.getTime()) && toISO(date) === iso;
+    return window.PixelCore.isValidISO(iso);
   }
 
   function normalizeTimeValue(value) {
@@ -276,9 +277,7 @@
   }
 
   function addDays(date, amount) {
-    const result = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    result.setDate(result.getDate() + amount);
-    return result;
+    return window.PixelCore.addDays(date, amount);
   }
 
   function addMonths(date, amount) {
@@ -306,9 +305,7 @@
   }
 
   function startOfWeek(date) {
-    const result = startOfDay(date);
-    result.setDate(result.getDate() - weekOffset(result));
-    return result;
+    return window.PixelCore.startOfWeek(date, weekStartDay());
   }
 
   function endOfMonth(year, month) {
@@ -327,12 +324,7 @@
   }
 
   function plural(number, forms) {
-    const abs = Math.abs(number) % 100;
-    const last = abs % 10;
-    if (abs > 10 && abs < 20) return forms[2];
-    if (last > 1 && last < 5) return forms[1];
-    if (last === 1) return forms[0];
-    return forms[2];
+    return window.PixelCore.plural(number, forms);
   }
 
   function tasksWord(number) {
@@ -558,7 +550,21 @@
     return (window.PixelSync && window.PixelSync.SCHEMA_VERSION) || 4;
   }
 
+  // Могилы старше месяца нужны только пока устройства не обменялись: обрезаем их
+  // лишь после недавнего успешного обмена, иначе удаление с другого устройства
+  // вернёт запись.
+  function pruneOldTombstones() {
+    const sync = window.PixelSync;
+    if (!sync || typeof sync.pruneTombstones !== "function") return;
+    const config = sync.getSyncConfig();
+    if (!config.url || !config.token) return;
+    if (!config.lastOkAt || Date.now() - config.lastOkAt > sync.TOMBSTONE_SYNC_GRACE_MS) return;
+    sync.pruneTombstones(state, Date.now());
+  }
+
   function saveStore() {
+    entriesCache.clear();
+    pruneOldTombstones();
     try {
       // Настройки синхронизируются блоком, поэтому метка времени обновляется
       // только когда их содержимое действительно изменилось.
@@ -576,6 +582,7 @@
       });
       stashPreviousStore(localStorage.getItem(STORAGE_KEY));
       localStorage.setItem(STORAGE_KEY, payload);
+      updateSyncSize(payload.length);
       syncNativeWidget();
       if (window.PixelSync && !applyingRemote) {
         window.PixelSync.scheduleSync(2000);
@@ -599,6 +606,7 @@
     const entries = getEntries(iso);
     return {
       date: iso,
+      iso,
       label: formatLongDate(date),
       weekday: WEEKDAYS_FULL[date.getDay()],
       holiday: holidayForISO(iso) || "",
@@ -607,6 +615,7 @@
       done: entries.filter((entry) => entry.done).length,
       total: entries.length,
       tasks: entries.slice(0, 8).map((entry) => ({
+        key: entry.isSeries ? `series:${entry.seriesId}@${iso}` : `task:${entry.taskId}`,
         text: entry.text.slice(0, 80),
         done: entry.done,
         series: entry.isSeries
@@ -642,24 +651,38 @@
     }, 250);
   }
 
+  // Тапы по строкам виджета приходят из native PendingIntent: применяем их к живым задачам.
+  function consumeWidgetToggles() {
+    const plugin = window.Capacitor?.Plugins?.WidgetBridge;
+    if (!plugin || typeof plugin.consumeToggles !== "function") return;
+    Promise.resolve(plugin.consumeToggles()).then((result) => {
+      const items = result && Array.isArray(result.items) ? result.items : [];
+      if (!items.length) return;
+      let changed = false;
+      items.forEach((item) => {
+        const raw = item && typeof item.key === "string" ? item.key : "";
+        if (!raw.startsWith("task:")) return;
+        const id = raw.slice("task:".length);
+        Object.keys(state.tasks).forEach((iso) => {
+          state.tasks[iso].forEach((task) => {
+            if (task.id !== id || task.deletedAt || task.done) return;
+            task.done = true;
+            task.snoozedUntil = null;
+            task.updatedAt = Date.now();
+            changed = true;
+          });
+        });
+      });
+      if (!changed) return;
+      saveStore();
+      renderAll(false);
+    }).catch((error) => {
+      console.warn("WidgetBridge.consumeToggles failed", error);
+    });
+  }
+
   function isSeriesActiveOn(series, iso) {
-    if (!series || series.deletedAt || !isValidISO(iso)) return false;
-    if (iso < series.start) return false;
-    if (series.end && iso > series.end) return false;
-    const exception = series.exceptions && series.exceptions[iso];
-    if (exception && exception.deleted) return false;
-    const date = fromISO(iso);
-    const start = fromISO(series.start);
-    const diff = Math.round((date - start) / 86400000);
-    if (diff < 0) return false;
-    if (series.freq === "daily") return true;
-    if (series.freq === "weekdays") return date.getDay() >= 1 && date.getDay() <= 5;
-    if (series.freq === "weekly") return diff % 7 === 0 && date.getDay() === start.getDay();
-    if (series.freq === "monthly") return date.getDate() === start.getDate();
-    if (series.freq === "yearly") {
-      return date.getMonth() === start.getMonth() && date.getDate() === start.getDate();
-    }
-    return false;
+    return window.PixelCore.isSeriesActiveOn(series, iso);
   }
 
   function seriesStatsFor(series) {
@@ -684,6 +707,8 @@
   }
 
   function getEntries(iso) {
+    const cached = entriesCache.get(iso);
+    if (cached) return cached;
     const tasks = (state.tasks[iso] || [])
       .filter((task) => !task.deletedAt)
       .map((task) => ({
@@ -716,12 +741,14 @@
       });
 
     // Сначала дела со временем — по часам; без времени — ниже, в порядке добавления.
-    return tasks.concat(recurring).sort((a, b) => {
+    const entries = tasks.concat(recurring).sort((a, b) => {
       if (a.time && b.time && a.time !== b.time) return a.time < b.time ? -1 : 1;
       if (a.time && !b.time) return -1;
       if (!a.time && b.time) return 1;
       return a.createdAt - b.createdAt;
     });
+    entriesCache.set(iso, entries);
+    return entries;
   }
 
   function getEntryByKey(iso, key) {
@@ -2107,6 +2134,7 @@
   function openSettings() {
     syncSettingsControls();
     updateSettingsMeta();
+    updateSyncSize();
     refreshSyncFields();
     renderSeriesStats();
     if (!/^https?:$/.test(window.location.protocol)) {
@@ -2450,6 +2478,74 @@
     showToast("Все задачи удалены");
   }
 
+  // Полное стирание: без могил, с чисткой копий и, если настроено, серверной копии.
+  async function eraseAllData() {
+    if (!window.confirm(
+      "Стереть все задачи и серии безвозвратно? Копии в этом браузере тоже удалятся. "
+      + "Если настроена синхронизация, будет очищена и серверная копия. Отменить это нельзя."
+    )) return;
+    const answer = window.prompt("Чтобы подтвердить стирание, введите слово «стереть».", "");
+    if (answer === null) return;
+    if (answer.trim().toLowerCase() !== "стереть") {
+      showToast("Слово не совпало — данные не тронуты");
+      return;
+    }
+
+    let remoteError = "";
+    const sync = window.PixelSync;
+    if (sync && typeof sync.wipeRemote === "function") {
+      const config = sync.getSyncConfig();
+      if (config.url && config.token) {
+        try {
+          await sync.wipeRemote();
+        } catch (error) {
+          remoteError = (error && error.message) || "ошибка сети";
+        }
+      }
+    }
+
+    const today = startOfDay(new Date());
+    state.tasks = {};
+    state.series = [];
+    state.settings = { ...DEFAULT_SETTINGS, templates: [], updatedAt: 0 };
+    state.view = "month";
+    state.editingKey = null;
+    state.deleteConfirmKey = null;
+    state.dialogDate = null;
+    state.selectedDate = toISO(today);
+    state.cursor = new Date(today);
+    entriesCache.clear();
+    lastWidgetPayload = "";
+    // saveStore снимет все запланированные уведомления: список дел пуст.
+    saveStore();
+    // Копии удаляем после сохранения: иначе saveStore сделает снимок стёртого.
+    clearWrappedStore(BACKUP_KEY);
+    clearWrappedStore(CORRUPT_KEY);
+    try {
+      localStorage.removeItem(BACKUP_STAMP_KEY);
+    } catch (error) {
+      /* хранилище недоступно — чистить нечего */
+    }
+    applyProfile();
+    applyDaytime();
+    applyHoliday();
+    renderAll(false);
+    if (els.settingsDialog.open) {
+      syncSettingsControls();
+      refreshSyncFields();
+      renderSeriesStats();
+    }
+    updateSettingsMeta();
+    if (remoteError) {
+      window.alert(
+        `Локальные данные стёрты. Серверная копия осталась: ${remoteError}. `
+        + "При следующей синхронизации записи вернутся с сервера."
+      );
+    } else {
+      showToast("Данные стёрты безвозвратно");
+    }
+  }
+
   function showToast(message) {
     els.toastText.textContent = message;
     els.toast.classList.add("is-visible");
@@ -2485,6 +2581,26 @@
     } catch (error) {
       return "";
     }
+  }
+
+  function syncStateSize() {
+    try {
+      return JSON.stringify({
+        version: schemaVersion(),
+        view: state.view,
+        tasks: state.tasks,
+        series: state.series,
+        settings: state.settings
+      }).length;
+    } catch (error) {
+      return 0;
+    }
+  }
+
+  function updateSyncSize(bytes) {
+    if (!els.syncSize) return;
+    const kb = Math.max(1, Math.round((typeof bytes === "number" ? bytes : syncStateSize()) / 1024));
+    els.syncSize.textContent = `≈ ${kb} КБ`;
   }
 
   function renderSyncStatus(status) {
@@ -2999,6 +3115,7 @@
     els.importJsonBtn.addEventListener("click", () => els.importFile.click());
     els.importFile.addEventListener("change", handleImportFile);
     els.clearDataBtn.addEventListener("click", clearAllData);
+    if (els.wipeDataBtn) els.wipeDataBtn.addEventListener("click", eraseAllData);
     if (els.perfBtn) els.perfBtn.addEventListener("click", runPerfProbe);
     if (els.perfCopyBtn) els.perfCopyBtn.addEventListener("click", copyProbeReport);
 
@@ -3051,6 +3168,7 @@
         state.series = parsed.series;
         state.settings = parsed.settings;
         state.view = parsed.view;
+        entriesCache.clear();
         applyProfile();
         renderAll(false);
         if (state.dialogDate && els.dialog.open) populateDialog();
@@ -3413,6 +3531,14 @@
     });
   }
 
+  function setupWidgetToggles() {
+    consumeWidgetToggles();
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible") return;
+      consumeWidgetToggles();
+    });
+  }
+
   function registerServiceWorker() {
     const capacitor = window.Capacitor;
     if (capacitor && typeof capacitor.isNativePlatform === "function" && capacitor.isNativePlatform()) return;
@@ -3576,6 +3702,7 @@
     setupRecovery();
     registerServiceWorker();
     setupAppUpdateCheck();
+    setupWidgetToggles();
     renderAll(true);
     setupSnowman();
     document.fonts.ready.then(scheduleFitMonth);

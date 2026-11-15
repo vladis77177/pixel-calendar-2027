@@ -6,6 +6,11 @@
   const SCHEMA_VERSION = 4;
   // За сколько до срока напоминать. null — ровно в срок.
   const LEAD_MINUTES = [10, 60, 1440];
+  // Могилы старше месяца не нужны: все устройства успевали обменяться.
+  const TOMBSTONE_TTL_MS = 30 * 86400000;
+  // Обрезаем могилы только после недавнего успешного обмена: иначе удаление
+  // с другого устройства «воскресит» запись.
+  const TOMBSTONE_SYNC_GRACE_MS = 7 * 86400000;
   const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
   const ISO_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
   // Дублируем значения из app.js: sync.js должен работать без DOM.
@@ -225,6 +230,57 @@
     return tasks;
   }
 
+  // Сбитые часы устройства не должны выигрывать LWW: всё, что «из будущего» относительно
+  // серверного времени, подрезаем до него. Тот же допуск, что у сервера (server.js).
+  const MAX_FUTURE_SKEW_MS = 5 * 60 * 1000;
+
+  function clampFuture(state, now) {
+    if (!state || typeof state !== "object") return state;
+    const limit = now + MAX_FUTURE_SKEW_MS;
+    const copy = JSON.parse(JSON.stringify(state));
+    const fix = (item) => {
+      if (item && timeMs(item.updatedAt) > limit) item.updatedAt = Math.floor(now);
+    };
+    Object.keys(copy.tasks || {}).forEach((iso) => {
+      if (Array.isArray(copy.tasks[iso])) copy.tasks[iso].forEach(fix);
+    });
+    (copy.series || []).forEach(fix);
+    fix(copy.settings);
+    return copy;
+  }
+
+  // Убирает могилы старше TOMBSTONE_TTL_MS из задач и серий. Мутирует state на месте
+  // и возвращает число убранных записей. Условие «когда можно» проверяет вызывающий.
+  function pruneTombstones(state, now) {
+    if (!state || typeof state !== "object") return 0;
+    const moment = Number.isFinite(now) ? now : Date.now();
+    let removed = 0;
+    const expired = (item) => {
+      const deletedAt = timeMs(item && item.deletedAt);
+      return Boolean(deletedAt) && moment - deletedAt > TOMBSTONE_TTL_MS;
+    };
+    if (state.tasks && typeof state.tasks === "object") {
+      Object.keys(state.tasks).forEach((iso) => {
+        if (!Array.isArray(state.tasks[iso])) return;
+        const kept = state.tasks[iso].filter((task) => {
+          if (!expired(task)) return true;
+          removed += 1;
+          return false;
+        });
+        if (kept.length) state.tasks[iso] = kept;
+        else delete state.tasks[iso];
+      });
+    }
+    if (Array.isArray(state.series)) {
+      state.series = state.series.filter((series) => {
+        if (!expired(series)) return true;
+        removed += 1;
+        return false;
+      });
+    }
+    return removed;
+  }
+
   function mergeStates(localState, remoteState) {
     const local = localState || { tasks: {}, series: [], settings: {} };
     const remote = remoteState || { tasks: {}, series: [], settings: {} };
@@ -283,6 +339,8 @@
   let autoStarted = false;
   let statusListener = null;
   let lastStatus = { state: "idle" };
+  // Пока идёт стирание, обмен не запускаем: иначе он вернёт только что удалённое.
+  let suspended = false;
 
   function readSyncConfig() {
     if (typeof localStorage === "undefined") return { ...SYNC_DEFAULTS };
@@ -341,6 +399,7 @@
   }
 
   function scheduleSync(delay) {
+    if (suspended) return;
     if (!readSyncConfig().url) return;
     if (typeof setTimeout === "undefined") return;
     clearTimeout(syncTimer);
@@ -352,6 +411,7 @@
   // Один цикл: отправляем своё состояние, получаем слитое сервером.
   // Полный обмен вместо инкрементов: для личного объёма это дешевле и надёжнее.
   function syncNow() {
+    if (suspended) return Promise.resolve({ ok: false, reason: "Идёт стирание данных" });
     if (syncPromise) return syncPromise;
     const config = readSyncConfig();
     if (!config.url || !config.token) {
@@ -384,7 +444,11 @@
         if (!remote || typeof remote.serverTime !== "number") {
           throw new Error("Сервер вернул неожиданный ответ");
         }
-        const merged = mergeStates(syncProvider.getState(), remote);
+        const clock = remote.serverTime;
+        const merged = mergeStates(
+          clampFuture(syncProvider.getState(), clock),
+          clampFuture(remote, clock)
+        );
         syncProvider.applyState(merged);
         const skew = Math.abs(remote.serverTime - Date.now());
         const next = {
@@ -413,6 +477,61 @@
     return syncPromise;
   }
 
+  // Стирает серверную копию: без этого следующее слияние вернёт удалённые записи.
+  // Ошибку отдаём наружу — интерфейс сам решит, что сказать человеку.
+  function wipeRemote() {
+    const config = readSyncConfig();
+    if (!config.url || !config.token) {
+      return Promise.reject(new Error("Синхронизация не настроена"));
+    }
+    if (typeof fetch === "undefined") {
+      return Promise.reject(new Error("Синхронизация недоступна"));
+    }
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timeout = controller ? setTimeout(() => controller.abort(), SYNC_TIMEOUT) : 0;
+    // Обмен мог быть в полёте: дожидаемся его, иначе он вернёт только что стёртое.
+    const pending = syncPromise ? syncPromise.catch(() => null) : Promise.resolve(null);
+    clearTimeout(syncTimer);
+    suspended = true;
+    emitStatus({ state: "syncing" });
+
+    return pending
+      .then(() => fetch(`${config.url}/api/state`, {
+        method: "DELETE",
+        headers: { "X-Sync-Token": config.token },
+        cache: "no-store",
+        signal: controller ? controller.signal : undefined
+      }))
+      .then((response) => {
+        if (response.status === 401) throw new Error("Неверный код подключения");
+        if (!response.ok) throw new Error(`Сервер ответил ${response.status}`);
+        return response.json();
+      })
+      .then((remote) => {
+        const next = {
+          ...readSyncConfig(),
+          lastSyncAt: typeof remote.serverTime === "number" ? remote.serverTime : Date.now(),
+          lastOkAt: Date.now(),
+          lastError: null
+        };
+        writeSyncConfig(next);
+        emitStatus({ state: "ok", at: next.lastOkAt });
+        return { ok: true };
+      })
+      .catch((error) => {
+        const message = error && error.name === "AbortError"
+          ? "Сервер не ответил за 8 секунд"
+          : (error && error.message) || "Ошибка сети";
+        writeSyncConfig({ ...readSyncConfig(), lastError: message });
+        emitStatus({ state: "error", message });
+        throw error instanceof Error ? error : new Error(message);
+      })
+      .finally(() => {
+        suspended = false;
+        if (timeout) clearTimeout(timeout);
+      });
+  }
+
   function startAutoSync() {
     if (autoStarted || typeof document === "undefined") return;
     autoStarted = true;
@@ -428,9 +547,15 @@
     SCHEMA_VERSION,
     migrateState,
     mergeStates,
+    clampFuture,
+    MAX_FUTURE_SKEW_MS,
+    TOMBSTONE_TTL_MS,
+    TOMBSTONE_SYNC_GRACE_MS,
+    pruneTombstones,
     normalizeTime,
     configure,
     syncNow,
+    wipeRemote,
     scheduleSync,
     getSyncStatus,
     setStatusListener,

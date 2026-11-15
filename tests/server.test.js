@@ -158,8 +158,9 @@ test("сервер синхронизации", async (t) => {
   });
 
   await t.test("могила удаляет задачу и сохраняется", async () => {
+    const now = Date.now();
     const tombstone = body({
-      "2026-11-10": [makeTask({ deletedAt: 500, updatedAt: 500 })]
+      "2026-11-10": [makeTask({ deletedAt: now, updatedAt: now })]
     });
     const response = await fetch(`${base}/api/state`, {
       method: "POST",
@@ -167,7 +168,41 @@ test("сервер синхронизации", async (t) => {
       body: JSON.stringify(tombstone)
     });
     const data = await response.json();
-    assert.equal(data.tasks["2026-11-10"][0].deletedAt, 500);
+    assert.equal(data.tasks["2026-11-10"][0].deletedAt, now);
+  });
+
+  await t.test("отметка времени из будущего подрезается, но запись сохраняется", async () => {
+    const future = Date.now() + 60 * 60 * 1000;
+    const incoming = body(
+      { "2026-11-11": [makeTask({ id: "future", text: "Сбитые часы", updatedAt: future })] },
+      [],
+      { updatedAt: future }
+    );
+    const response = await fetch(`${base}/api/state`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(incoming)
+    });
+    assert.equal(response.status, 200);
+    const data = await response.json();
+    const task = data.tasks["2026-11-11"].find((item) => item.id === "future");
+    assert.ok(task, "задача с временем из будущего не должна пропасть");
+    assert.equal(task.text, "Сбитые часы");
+    const limit = Date.now() + 5 * 60 * 1000 + 1000;
+    assert.ok(task.updatedAt <= limit, "updatedAt подрезан до серверного времени");
+    assert.ok(data.settings.updatedAt <= limit, "settings.updatedAt подрезан");
+  });
+
+  await t.test("прошлое время не подрезается", async () => {
+    const incoming = body({ "2026-11-12": [makeTask({ id: "past", updatedAt: 1000 })] });
+    const response = await fetch(`${base}/api/state`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(incoming)
+    });
+    const data = await response.json();
+    const task = data.tasks["2026-11-12"].find((item) => item.id === "past");
+    assert.equal(task.updatedAt, 1000);
   });
 
   await t.test("статика отдаётся, обход каталога закрыт", async () => {
@@ -242,6 +277,23 @@ test("сервер синхронизации", async (t) => {
     const response = await fetch(`http://127.0.0.1:${secondPort}/api/state`, { headers });
     const data = await response.json();
     assert.ok(data.tasks["2026-11-10"], "состояние восстановлено из датированной копии");
+  });
+
+  await t.test("DELETE без кода подключения — 401", async () => {
+    const response = await fetch(`${base}/api/state`, { method: "DELETE" });
+    assert.equal(response.status, 401);
+  });
+
+  await t.test("DELETE с кодом стирает состояние и перезаписывает state.json", async () => {
+    const response = await fetch(`${base}/api/state`, { method: "DELETE", headers });
+    assert.equal(response.status, 200);
+    const data = await response.json();
+    assert.deepEqual(data.tasks, {});
+    assert.deepEqual(data.series, []);
+    const saved = JSON.parse(fs.readFileSync(path.join(dataDir, "state.json"), "utf8"));
+    assert.equal(saved.version, 4);
+    assert.deepEqual(saved.tasks, {});
+    assert.deepEqual(saved.series, []);
   });
 });
 

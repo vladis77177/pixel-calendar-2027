@@ -1,6 +1,13 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { migrateState, mergeStates } = require("../sync.js");
+const {
+  migrateState,
+  mergeStates,
+  clampFuture,
+  pruneTombstones,
+  TOMBSTONE_TTL_MS,
+  TOMBSTONE_SYNC_GRACE_MS
+} = require("../sync.js");
 
 function task(overrides) {
   return {
@@ -299,4 +306,68 @@ test("версию схемы пишет только sync.js, а не app.js", 
     !/versionCode \d+/.test(app),
     "app.js не должен заниматься версиями сборки"
   );
+});
+
+test("pruneTombstones: могилы старше 30 дней убираются, свежие и живые остаются", () => {
+  const now = 1700000000000;
+  const current = state({
+    "2027-01-01": [
+      task({ id: "fresh", deletedAt: now - 1000, updatedAt: now - 1000 }),
+      task({ id: "border", deletedAt: now - TOMBSTONE_TTL_MS, updatedAt: now - TOMBSTONE_TTL_MS }),
+      task({ id: "old", deletedAt: now - TOMBSTONE_TTL_MS - 1, updatedAt: now - TOMBSTONE_TTL_MS - 1 })
+    ],
+    "2027-01-02": [
+      task({ id: "only-old", deletedAt: now - TOMBSTONE_TTL_MS - 5, updatedAt: now - TOMBSTONE_TTL_MS - 5 })
+    ]
+  }, [
+    {
+      id: "s-old",
+      text: "Старая серия",
+      freq: "daily",
+      start: "2027-01-01",
+      createdAt: 1,
+      updatedAt: now - TOMBSTONE_TTL_MS - 2,
+      deletedAt: now - TOMBSTONE_TTL_MS - 2,
+      exceptions: {}
+    },
+    {
+      id: "s-live",
+      text: "Живая серия",
+      freq: "daily",
+      start: "2027-01-01",
+      createdAt: 1,
+      updatedAt: now,
+      deletedAt: null,
+      exceptions: {}
+    }
+  ]);
+
+  assert.equal(pruneTombstones(current, now), 3);
+  assert.deepEqual(Object.keys(current.tasks), ["2027-01-01"]);
+  assert.deepEqual(current.tasks["2027-01-01"].map((item) => item.id), ["fresh", "border"]);
+  assert.deepEqual(current.series.map((item) => item.id), ["s-live"]);
+  assert.equal(pruneTombstones(null, now), 0);
+  assert.equal(TOMBSTONE_TTL_MS, 30 * 86400000);
+  assert.equal(TOMBSTONE_SYNC_GRACE_MS, 7 * 86400000);
+});
+
+test("clampFuture: отметки из будущего подрезаются, прошлое и допуск не трогаются", () => {
+  const now = 1700000000000;
+  const original = {
+    tasks: {
+      "2027-01-01": [
+        { id: "a", updatedAt: now + 3600000 },
+        { id: "b", updatedAt: now - 5 }
+      ]
+    },
+    series: [{ id: "s", updatedAt: now + 4000 }],
+    settings: { updatedAt: now + 10 * 60 * 1000 }
+  };
+  const result = clampFuture(original, now);
+  assert.equal(result.tasks["2027-01-01"][0].updatedAt, now);
+  assert.equal(result.tasks["2027-01-01"][1].updatedAt, now - 5);
+  assert.equal(result.series[0].updatedAt, now + 4000);
+  assert.equal(result.settings.updatedAt, now);
+  assert.equal(original.tasks["2027-01-01"][0].updatedAt, now + 3600000, "исходное состояние не меняется");
+  assert.equal(clampFuture(null, now), null);
 });
