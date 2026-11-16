@@ -362,6 +362,10 @@
 
         <ul class="task-list" id="taskList" aria-label="Задачи на день"></ul>
 
+        <button class="pixel-btn move-tomorrow-btn" id="moveTomorrowBtn" type="button" hidden>
+          Перенести на завтра
+        </button>
+
         <div class="template-chips" id="templateChips" role="group" aria-label="Быстрые дела" hidden></div>
 
         <form class="add-form" id="taskForm" novalidate>
@@ -720,6 +724,7 @@
   <div class="toast" id="toast" role="status" aria-live="polite">
     <span class="toast-cube" aria-hidden="true"></span>
     <span id="toastText">Сохранено</span>
+    <button class="toast-action" id="toastAction" type="button" hidden>Отменить</button>
   </div>
 
   <div class="snow" aria-hidden="true"></div>

@@ -623,6 +623,30 @@ html[data-daytime="night"] .toast-cube {
     inset 0 2px 0 #b9f397;
 }
 
+/* Действие в тосте ночью: тёмно-синий тост не пропускает клики внутрь себя,
+   поэтому кнопка остаётся отдельной светлой плашкой — тон приглушён, чтобы не
+   стать самым ярким предметом экрана (текст 10.9:1, плашка к тосту 8.4:1). */
+html[data-daytime="night"] .toast-action {
+  background: #e7d6ad;
+  border-color: #111722;
+  box-shadow:
+    0 2px 0 #070b16,
+    inset 0 2px 0 #fbf1d6,
+    inset 0 -2px 0 #c3ab78;
+  color: #2f2113;
+}
+
+html[data-daytime="night"] .toast-action:hover {
+  background: #f2e4c2;
+}
+
+html[data-daytime="night"] .toast-action:active {
+  box-shadow:
+    0 1px 0 #070b16,
+    inset 0 2px 0 #fbf1d6,
+    inset 0 -2px 0 #c3ab78;
+}
+
 /* Крестик закрытия: светлая плашка была вторым по яркости предметом после
    полосы заголовка. Ночью — тёмная зелень со светлой рамкой (иконка 4.7:1). */
 html[data-daytime="night"] .dialog-close {
@@ -636,6 +660,33 @@ html[data-daytime="night"] .dialog-close {
 
 html[data-daytime="night"] .dialog-close:hover {
   background: #36502a;
+}
+
+/* Перенос незавершённого ночью: под множительным слоем кремовая плашка
+   сливалась с бумагой карточки (156,131,89 против 147,122,82). Поднимаем её
+   над слоем, как зелёную «Добавить», но оставляем кремовой и глуше — это
+   второе по важности действие, а не главное. */
+html[data-daytime="night"] .move-tomorrow-btn {
+  position: relative;
+  z-index: 21;
+  background: #ddc9a2;
+  border-color: #2c1e11;
+  box-shadow:
+    0 3px 0 #120c05,
+    inset 0 2px 0 #f2e6c8,
+    inset 0 -2px 0 #b39c6d;
+  color: #2f2113;
+}
+
+html[data-daytime="night"] .move-tomorrow-btn:hover {
+  background: #e8d7b2;
+}
+
+html[data-daytime="night"] .move-tomorrow-btn:active {
+  box-shadow:
+    0 1px 0 #120c05,
+    inset 0 2px 0 #f2e6c8,
+    inset 0 -2px 0 #b39c6d;
 }
 
 /* Настройки ночью: карточка и секции почти сливались (после слоя #fbf0d5 даёт
@@ -2449,6 +2500,64 @@ html[data-profile="full"] .day-dialog::backdrop {
   list-style: none;
 }
 
+/* «Перенести незавершённое» — второе по важности действие окна дня. Широкая,
+   но кремовая (как .pixel-btn), чтобы не спорить с зелёной «Добавить»;
+   отступы повторяют ритм диалога: 10px от списка, 2px до блока ниже (там уже
+   13px отступа у .add-form). При hidden правило не работает — блок исчезает,
+   layout не прыгает. */
+.move-tomorrow-btn {
+  display: flex;
+  width: 100%;
+  min-height: 38px;
+  margin: 10px 0 2px;
+  padding: 7px 12px;
+  background: #f4e2b7;
+  /* Рамка на тон светлее var(--line): кнопка вторичная, чёрный контур здесь
+     звучал бы громче зелёной. */
+  border: 2px solid #8a7448;
+  box-shadow:
+    0 3px 0 #b79a63,
+    inset 0 2px 0 #fff6d7,
+    inset 0 -2px 0 #d9bf86;
+  color: #3a2918;
+  font-family: var(--font-pixel);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  text-align: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    transform 0.08s steps(2, end),
+    box-shadow 0.08s steps(2, end),
+    background-color 0.12s ease;
+}
+
+/* .pixel-btn:hover/:active поднимали кнопку на 1px и красили тень в var(--line);
+   для вторичной кнопки это слишком громко — свой, более тихий отклик. */
+.move-tomorrow-btn:hover {
+  background: #fbecc9;
+  transform: translateY(-1px);
+  box-shadow:
+    0 4px 0 #b79a63,
+    inset 0 2px 0 #fff6d7,
+    inset 0 -2px 0 #d9bf86;
+}
+
+.move-tomorrow-btn:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 1px 0 #b79a63,
+    inset 0 2px 0 #fff6d7,
+    inset 0 -2px 0 #d9bf86;
+}
+
+.move-tomorrow-btn:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
 .task-item {
   display: flex;
   align-items: flex-start;
@@ -2774,6 +2883,61 @@ html[data-profile="full"] .day-dialog::backdrop {
   box-shadow:
     0 0 0 2px var(--line),
     inset 0 2px 0 #b9f397;
+}
+
+/* Клики ловит только кнопка: у самого тоста pointer-events: none. */
+.toast-action {
+  appearance: none;
+  flex: 0 0 auto;
+  margin-left: 4px;
+  min-height: 32px;
+  padding: 0 10px;
+  background: #f2e3bf;
+  border: 2px solid var(--line);
+  box-shadow:
+    0 2px 0 var(--line),
+    inset 0 2px 0 #fff6d7,
+    inset 0 -2px 0 #d9bf86;
+  color: #3a2918;
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+  transition:
+    transform 0.08s steps(2, end),
+    box-shadow 0.08s steps(2, end),
+    background-color 0.12s ease;
+}
+
+/* Длинная подпись сжимается и переносится, а не выдавливает кнопку за тост. */
+.toast > span:not(.toast-cube) {
+  min-width: 0;
+}
+
+/* Кнопка выше текста тоста на 8px; на узком экране тост не раздувается. */
+.toast:has(.toast-action:not([hidden])) {
+  padding-block: 7px;
+}
+
+.toast-action:hover {
+  background: #fff6d7;
+}
+
+.toast-action:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 1px 0 var(--line),
+    inset 0 2px 0 #fff6d7,
+    inset 0 -1px 0 #d9bf86;
+}
+
+.toast-action:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
 }
 
 /* ——— Обновление ——— */

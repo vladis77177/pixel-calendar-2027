@@ -125,6 +125,7 @@
     daySummaryText: document.getElementById("daySummaryText"),
     dayProgressBar: document.getElementById("dayProgressBar"),
     taskList: document.getElementById("taskList"),
+    moveTomorrowBtn: document.getElementById("moveTomorrowBtn"),
     taskForm: document.getElementById("taskForm"),
     taskInput: document.getElementById("taskInput"),
     taskRepeat: document.getElementById("taskRepeat"),
@@ -185,6 +186,7 @@
     syncSize: document.getElementById("syncSize"),
     toast: document.getElementById("toast"),
     toastText: document.getElementById("toastText"),
+    toastAction: document.getElementById("toastAction"),
     updateBar: document.getElementById("updateBar"),
     updateTitle: document.getElementById("updateTitle"),
     updateText: document.getElementById("updateText"),
@@ -227,6 +229,9 @@
   let lastDayISO = null;
   let enterTimer = 0;
   let toastTimer = 0;
+let toastAction = null;
+let toastHome = null;
+const TOAST_ACTION_MS = 6000;
   let storageWarned = false;
   let deferredInstallPrompt = null;
   let suppressClickUntil = 0;
@@ -278,6 +283,10 @@
 
   function addDays(date, amount) {
     return window.PixelCore.addDays(date, amount);
+  }
+
+  function addDaysIso(iso, amount) {
+    return window.PixelCore.addDaysIso(iso, amount);
   }
 
   function addMonths(date, amount) {
@@ -1642,6 +1651,47 @@
     const percent = summary.total ? Math.round((summary.done / summary.total) * 100) : 0;
     els.daySummaryText.textContent = summary.text;
     els.dayProgressBar.style.width = `${percent}%`;
+    // Перенос касается только обычных дел: отметку дня серии переносить некуда.
+    const movable = entries.filter((entry) => !entry.isSeries && !entry.done).length;
+    const target = addDaysIso(state.dialogDate, 1);
+    els.moveTomorrowBtn.hidden = movable === 0;
+    els.moveTomorrowBtn.textContent = target === toISO(addDays(new Date(), 1))
+      ? "Перенести незавершённое на завтра"
+      : `Перенести незавершённое на ${formatLongDate(fromISO(target))}`;
+  }
+
+  // Незавершённые дела переезжают на следующий день. Могилы не нужны: запись
+  // физически переносится в другую корзину с тем же id, поэтому синхронизация
+  // не увидит удаления.
+  function moveUnfinishedToTomorrow() {
+    if (!state.dialogDate) return;
+    const from = state.dialogDate;
+    const to = addDaysIso(from, 1);
+    const tasks = state.tasks[from] || [];
+    const moving = tasks.filter((task) => !task.deletedAt && !task.done);
+    if (!moving.length) return;
+
+    const now = Date.now();
+    moving.forEach((task) => {
+      task.updatedAt = now;
+      if (task.time) task.remindAt = remindTimestamp(to, task.time);
+    });
+    const rest = tasks.filter((task) => !moving.includes(task));
+    if (rest.length) state.tasks[from] = rest;
+    else delete state.tasks[from];
+    if (!state.tasks[to]) state.tasks[to] = [];
+    state.tasks[to].push(...moving);
+    if (state.editingKey && moving.some((task) => `task:${task.id}` === state.editingKey)) {
+      state.editingKey = null;
+    }
+
+    saveStore();
+    renderTaskList();
+    refreshDialogSummary();
+    updateMainAfterTaskChange();
+    showToast(moving.length === 1
+      ? `Дело перенесено на ${formatLongDate(fromISO(to))}`
+      : `${moving.length} ${plural(moving.length, ["дело", "дела", "дел"])} перенесено на ${formatLongDate(fromISO(to))}`);
   }
 
   function updateMainAfterTaskChange() {
@@ -1861,13 +1911,27 @@
     // Не вырезаем запись: могила не даёт удалению «воскреснуть» при синхронизации.
     removed.deletedAt = Date.now();
     removed.updatedAt = removed.deletedAt;
+    const tombstone = removed.deletedAt;
     if (state.editingKey === key) state.editingKey = null;
     if (state.deleteConfirmKey === key) state.deleteConfirmKey = null;
     saveStore();
     renderTaskList();
     refreshDialogSummary();
     updateMainAfterTaskChange();
-    showToast(removed.done ? "Выполненное дело убрано" : "Задача удалена");
+    showToast(removed.done ? "Выполненное дело убрано" : "Задача удалена", {
+      label: "Отменить",
+      run() {
+        // Если за это время запись удалили заново, старую могилу не трогаем.
+        if (removed.deletedAt !== tombstone) return;
+        removed.deletedAt = null;
+        removed.updatedAt = Date.now();
+        saveStore();
+        renderTaskList();
+        refreshDialogSummary();
+        updateMainAfterTaskChange();
+        showToast("Удаление отменено");
+      }
+    });
   }
 
   function deleteSeriesOccurrence(key) {
@@ -1881,11 +1945,25 @@
     exception.updatedAt = Date.now();
     series.exceptions[state.dialogDate] = exception;
     series.updatedAt = exception.updatedAt;
+    const iso = state.dialogDate;
     state.deleteConfirmKey = null;
     saveStore();
     populateDialog();
     updateMainAfterTaskChange();
-    showToast("Этот день серии удалён");
+    showToast("Этот день серии удалён", {
+      label: "Отменить",
+      run() {
+        const current = series.exceptions[iso];
+        if (!current || !current.deleted) return;
+        current.deleted = false;
+        current.updatedAt = Date.now();
+        series.updatedAt = current.updatedAt;
+        saveStore();
+        populateDialog();
+        updateMainAfterTaskChange();
+        showToast("День серии возвращён");
+      }
+    });
   }
 
   function deleteSeries(key) {
@@ -1895,11 +1973,23 @@
     if (!series) return;
     series.deletedAt = Date.now();
     series.updatedAt = series.deletedAt;
+    const tombstone = series.deletedAt;
     state.deleteConfirmKey = null;
     saveStore();
     populateDialog();
     updateMainAfterTaskChange();
-    showToast("Повторяющаяся серия удалена");
+    showToast("Повторяющаяся серия удалена", {
+      label: "Отменить",
+      run() {
+        if (series.deletedAt !== tombstone) return;
+        series.deletedAt = null;
+        series.updatedAt = Date.now();
+        saveStore();
+        populateDialog();
+        updateMainAfterTaskChange();
+        showToast("Серия восстановлена");
+      }
+    });
   }
 
   function addQuickTask(text) {
@@ -2546,13 +2636,64 @@
     }
   }
 
-  function showToast(message) {
+  // Окно дня — модальный <dialog> в top layer, а тост живёт в body и рисуется под ним.
+  // На время показа переносим тост внутрь открытого окна (его поддерево уже в top layer),
+  // после закрытия окна возвращаем назад, чтобы тост оставался видимым.
+  function revealToast() {
+    const host = document.querySelector("dialog[open]");
+    if (!host) {
+      if (toastHome && toastHome.isConnected && els.toast.parentElement !== toastHome) {
+        toastHome.appendChild(els.toast);
+      }
+      return;
+    }
+    if (els.toast.parentElement === host) return;
+    if (!toastHome) toastHome = els.toast.parentElement;
+    host.appendChild(els.toast);
+  }
+
+  function concealToast() {
+    els.toast.classList.remove("is-visible");
+    if (toastHome && toastHome.isConnected && els.toast.parentElement !== toastHome) {
+      toastHome.appendChild(els.toast);
+    }
+    toastHome = null;
+  }
+
+  // Окно закрылось, пока тост висел внутри него: возвращаем тост в body, не гася.
+  function detachToastFromDialogs(event) {
+    const dialog = event.currentTarget;
+    if (els.toast.parentElement !== dialog) return;
+    const home = toastHome && toastHome.isConnected ? toastHome : document.body;
+    home.appendChild(els.toast);
+    toastHome = null;
+  }
+
+  // Тост умеет держать одно действие («Отменить»): удаление без диалога подтверждения
+  // ошибочно не выбранную запись возвращает одним нажатием.
+  function showToast(message, action) {
     els.toastText.textContent = message;
+    toastAction = typeof action?.run === "function" ? action : null;
+    els.toastAction.hidden = !toastAction;
+    if (toastAction) els.toastAction.textContent = toastAction.label || "Отменить";
+    revealToast();
     els.toast.classList.add("is-visible");
     window.clearTimeout(toastTimer);
     toastTimer = window.setTimeout(() => {
-      els.toast.classList.remove("is-visible");
-    }, 2300);
+      toastAction = null;
+      els.toastAction.hidden = true;
+      concealToast();
+    }, toastAction ? TOAST_ACTION_MS : 2300);
+  }
+
+  function runToastAction() {
+    const action = toastAction;
+    if (!action) return;
+    toastAction = null;
+    els.toastAction.hidden = true;
+    window.clearTimeout(toastTimer);
+    concealToast();
+    action.run();
   }
 
   function refreshAtMidnight() {
@@ -2894,6 +3035,11 @@
     });
 
     els.dialogCloseBtn.addEventListener("click", closeDayDialog);
+    els.toastAction.addEventListener("click", runToastAction);
+    els.moveTomorrowBtn.addEventListener("click", moveUnfinishedToTomorrow);
+    [els.dialog, els.searchDialog, els.settingsDialog].forEach((dialog) => {
+      if (dialog) dialog.addEventListener("close", detachToastFromDialogs);
+    });
     bindDialogBackdrop(els.dialog, closeDayDialog);
 
     els.dialog.addEventListener("close", () => {
