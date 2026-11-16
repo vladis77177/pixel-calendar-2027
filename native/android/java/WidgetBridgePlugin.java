@@ -32,6 +32,14 @@ public class WidgetBridgePlugin extends Plugin {
     }
 
     @PluginMethod
+    public void consumeLaunch(PluginCall call) {
+        String mode = MainActivity.consumeQuickAdd();
+        JSObject result = new JSObject();
+        result.put("mode", mode == null ? "" : mode);
+        call.resolve(result);
+    }
+
+    @PluginMethod
     public void consumeToggles(PluginCall call) {
         Context context = getContext();
         SharedPreferences prefs = context.getSharedPreferences(CalendarWidgetProvider.PREFS, Context.MODE_PRIVATE);

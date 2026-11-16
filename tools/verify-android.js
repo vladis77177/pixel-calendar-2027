@@ -147,6 +147,29 @@ check(
   "Launch theme must declare postSplashScreenTheme = AppTheme.NoActionBar"
 );
 
+// Ярлыки долгого нажатия на иконку: файл, ссылка в манифесте и обработка в JS.
+const shortcuts = read("res/xml/shortcuts.xml");
+check(
+  manifest.includes("android.app.shortcuts"),
+  "MainActivity must reference android.app.shortcuts, otherwise long-press shortcuts never appear"
+);
+check(
+  shortcuts.includes('android:name="quick_add"'),
+  "shortcuts.xml must pass the quick_add extra"
+);
+for (const mode of ["now", "today", "tomorrow"]) {
+  check(shortcuts.includes(`android:value="${mode}"`), `Shortcut ${mode} is missing in shortcuts.xml`);
+}
+check(
+  /onNewIntent[\s\S]*captureQuickAdd/.test(mainActivity),
+  "MainActivity must capture the shortcut extra in onNewIntent (BridgeActivity does not call setIntent)"
+);
+check(bridge.includes("consumeLaunch"), "WidgetBridgePlugin must expose consumeLaunch for icon shortcuts");
+check(
+  fs.readFileSync(path.join(ROOT, "app.js"), "utf8").includes("setupQuickAdd"),
+  "app.js must open the quick-add dialog for icon shortcuts"
+);
+
 const appJs = fs.readFileSync(path.join(ROOT, "app.js"), "utf8");
 const payloadStart = appJs.indexOf("function buildWidgetPayload");
 const payloadEnd = appJs.indexOf("function nativeWidgetPlugin");

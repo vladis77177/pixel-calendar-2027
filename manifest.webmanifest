@@ -44,6 +44,18 @@
       "short_name": "Виджет",
       "url": "./widget.html",
       "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Добавить дело",
+      "short_name": "Добавить",
+      "url": "./index.html?add=now",
+      "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Дело на завтра",
+      "short_name": "На завтра",
+      "url": "./index.html?add=tomorrow",
+      "icons": [{ "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
   ]
 }

@@ -289,6 +289,14 @@ if (!manifest.includes(".WidgetToggleReceiver")) {
   manifest = manifest.replace("</application>", `${toggleReceiver}    </application>`);
 }
 
+// Ярлыки долгого нажатия: ссылка на файл shortcuts.xml в MainActivity.
+if (!manifest.includes("android.app.shortcuts")) {
+  manifest = manifest.replace(
+    /(<activity[\s\S]*?android:name="\.MainActivity"[\s\S]*?>)/,
+    `$1\n            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />`
+  );
+}
+
 // Разрешения для напоминаний и виджета. Capacitor сам добавляет часть из них,
 // но проверка по имени не даёт дублировать записи при повторном патче.
 const PERMISSIONS = [
@@ -360,8 +368,14 @@ if (!/networkSecurityConfig/.test(manifest)) {
 
 // 6. Widget strings
 const stringsFile = path.join(APP, "res", "values", "strings.xml");
+const SHORTCUT_LABELS = {
+  now: ["Сейчас", "Добавить дело на сейчас"],
+  today: ["Сегодня", "Добавить дело на сегодня"],
+  tomorrow: ["Завтра", "Добавить дело на завтра"]
+};
 if (fs.existsSync(stringsFile)) {
   let strings = fs.readFileSync(stringsFile, "utf8");
+  let stringsChanged = false;
   if (!strings.includes("widget_label")) {
     strings = strings.replace(
       "</resources>",
@@ -369,8 +383,45 @@ if (fs.existsSync(stringsFile)) {
       + '    <string name="widget_description">План на сегодня из Пиксельного календаря</string>\n'
       + "</resources>"
     );
-    fs.writeFileSync(stringsFile, strings);
+    stringsChanged = true;
   }
+  for (const [mode, [short, long]] of Object.entries(SHORTCUT_LABELS)) {
+    if (strings.includes(`shortcut_add_${mode}`)) continue;
+    strings = strings.replace(
+      "</resources>",
+      `    <string name="shortcut_add_${mode}">${short}</string>\n`
+      + `    <string name="shortcut_add_${mode}_long">${long}</string>\n`
+      + "</resources>"
+    );
+    stringsChanged = true;
+  }
+  if (stringsChanged) fs.writeFileSync(stringsFile, strings);
+}
+
+// Ярлыки долгого нажатия на иконку: сразу открыть добавление дела на нужный день.
+const shortcutsDir = path.join(APP, "res", "xml");
+fs.mkdirSync(shortcutsDir, { recursive: true });
+const shortcutsFile = path.join(shortcutsDir, "shortcuts.xml");
+const shortcutsXml = `<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+${Object.keys(SHORTCUT_LABELS).map((mode) => `    <shortcut
+        android:shortcutId="quick_add_${mode}"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_add_${mode}"
+        android:shortcutLongLabel="@string/shortcut_add_${mode}_long">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetPackage="${PACKAGE}"
+            android:targetClass="${PACKAGE}.MainActivity">
+            <extra android:name="quick_add" android:value="${mode}" />
+        </intent>
+    </shortcut>`).join("\n")}
+</shortcuts>
+`;
+if (!fs.existsSync(shortcutsFile) || fs.readFileSync(shortcutsFile, "utf8") !== shortcutsXml) {
+  fs.writeFileSync(shortcutsFile, shortcutsXml);
+  console.log("App shortcuts: quick add now / today / tomorrow");
 }
 
 // 7. Signing: use a stable release key when CI provides keystore.properties

@@ -3683,6 +3683,49 @@
     renderSnow();
   }
 
+  // Долгое нажатие на иконку (Android) и ярлыки PWA передают режим быстрого добавления:
+  // сразу открывается окно нужного дня, для «сейчас» — с ближайшим получасом.
+  function nextHalfHourTime(date) {
+    const next = new Date(date.getTime());
+    next.setMinutes(date.getMinutes() < 30 ? 30 : 60, 0, 0);
+    const hours = String(next.getHours()).padStart(2, "0");
+    const minutes = String(next.getMinutes()).padStart(2, "0");
+    return `${hours}:${minutes}`;
+  }
+
+  function openQuickAdd(mode) {
+    const today = new Date();
+    openDay(mode === "tomorrow" ? toISO(addDays(today, 1)) : toISO(today));
+    if (mode === "now") els.taskTime.value = nextHalfHourTime(today);
+    els.taskInput.focus();
+  }
+
+  function handleQuickAddRequest(mode) {
+    if (mode !== "now" && mode !== "today" && mode !== "tomorrow") return;
+    openQuickAdd(mode);
+  }
+
+  function setupQuickAdd() {
+    const fromUrl = new URLSearchParams(window.location.search).get("add");
+    if (fromUrl) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("add");
+      window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+      handleQuickAddRequest(fromUrl);
+    }
+    const plugin = window.Capacitor?.Plugins?.WidgetBridge;
+    if (!plugin || typeof plugin.consumeLaunch !== "function") return;
+    const readLaunch = () => {
+      Promise.resolve(plugin.consumeLaunch())
+        .then((result) => handleQuickAddRequest(result && result.mode))
+        .catch(() => {});
+    };
+    readLaunch();
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") readLaunch();
+    });
+  }
+
   function init() {
     applyProfile();
     applyDaytime();
@@ -3701,6 +3744,7 @@
     setupSnowman();
     document.fonts.ready.then(scheduleFitMonth);
     syncNativeWidget();
+    setupQuickAdd();
   }
 
   init();

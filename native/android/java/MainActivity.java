@@ -1,5 +1,6 @@
 package __PACKAGE__;
 
+import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
@@ -9,15 +10,40 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     private static final long FIRST_FRAME_TIMEOUT_MS = 2000L;
+    // Ярлык долгого нажатия на иконку передаёт режим быстрого добавления.
+    private static final String QUICK_ADD_EXTRA = "quick_add";
+    private static String pendingQuickAdd = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        captureQuickAdd(getIntent());
         registerPlugin(WidgetBridgePlugin.class);
         super.onCreate(savedInstanceState);
         WebView webView = bridgeWebView();
         if (webView == null) return;
         paintWebViewBackground(webView);
         showAtFirstFrame(webView);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        // BridgeActivity не вызывает setIntent, поэтому забираем ярлык здесь.
+        captureQuickAdd(intent);
+    }
+
+    static String consumeQuickAdd() {
+        String mode = pendingQuickAdd;
+        pendingQuickAdd = null;
+        return mode;
+    }
+
+    private static void captureQuickAdd(Intent intent) {
+        if (intent == null) return;
+        String mode = intent.getStringExtra(QUICK_ADD_EXTRA);
+        if (mode == null || mode.isEmpty()) return;
+        intent.removeExtra(QUICK_ADD_EXTRA);
+        pendingQuickAdd = mode;
     }
 
     private WebView bridgeWebView() {
