@@ -210,22 +210,43 @@ for (const [dir, color] of [[VALUES, SKY_TOP_DAY], [VALUES_NIGHT, SKY_TOP_NIGHT]
   }
 }
 
-// 4c. Тема стартового окна: windowBackground — подложка, а не @null (иначе система
-// рисует своё полотно). Сплэш остаётся картинкой неба с травой поверх неё.
+// 4c. Тема стартового окна: windowBackground и colorBackground — цвет неба, а не @null
+// (иначе система рисует своё белое полотно). Для Android 12+ явно задаём фон сплэша и
+// тему после него: без windowSplashScreenBackground платформа берёт свой фон.
 const stylesFile = path.join(VALUES, "styles.xml");
 if (fs.existsSync(stylesFile)) {
+  const styleItems = {
+    "AppTheme.NoActionBar": [
+      ["android:windowBackground", "@color/splash_background"],
+      ["android:colorBackground", "@color/splash_background"]
+    ],
+    "AppTheme.NoActionBarLaunch": [
+      ["android:windowBackground", "@color/splash_background"],
+      ["android:colorBackground", "@color/splash_background"],
+      ["windowSplashScreenBackground", "@color/splash_background"],
+      ["postSplashScreenTheme", "@style/AppTheme.NoActionBar"]
+    ]
+  };
   let styles = fs.readFileSync(stylesFile, "utf8");
-  if (!styles.includes('name="android:windowBackground"')) {
-    styles = styles.replace(
-      /(<style name="AppTheme\.NoActionBar"[^>]*>)/,
-      `$1\n        <item name="android:windowBackground">@color/splash_background</item>`
+  let stylesChanged = false;
+  for (const [styleName, items] of Object.entries(styleItems)) {
+    const blockRe = new RegExp(
+      `(<style name="${styleName.replace(/\./g, "\\.")}"[^>]*>)([\\s\\S]*?)(</style>)`
     );
-    styles = styles.replace(
-      /(<style name="AppTheme\.NoActionBarLaunch"[^>]*>)/,
-      `$1\n        <item name="android:windowBackground">@color/splash_background</item>`
-    );
+    const match = styles.match(blockRe);
+    if (!match) continue;
+    let body = match[2];
+    let prefix = "";
+    for (const [name, value] of items) {
+      if (body.includes(`name="${name}"`)) continue;
+      prefix += `\n        <item name="${name}">${value}</item>`;
+      stylesChanged = true;
+    }
+    styles = styles.replace(blockRe, `${match[1]}${prefix}${body}${match[3]}`);
+  }
+  if (stylesChanged) {
     fs.writeFileSync(stylesFile, styles);
-    console.log("Launch theme: window background is the sky top colour");
+    console.log("Launch theme: sky background for the window and the splash");
   }
 }
 

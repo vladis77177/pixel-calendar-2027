@@ -82,6 +82,19 @@
     return false;
   }
 
+  // Фаза неба одна для приложения, виджета и раннего бутстрапа (boot.js):
+  // 5–8 рассвет, 8–17 день, 17–21 закат, иначе ночь.
+  const SKY_PHASES = ["dawn", "day", "dusk", "night"];
+
+  function skyPhaseFor(hour, mode) {
+    if (mode && mode !== "auto") return SKY_PHASES.includes(mode) ? mode : "day";
+    if (!(hour >= 0)) return "day";
+    if (hour >= 5 && hour < 8) return "dawn";
+    if (hour >= 8 && hour < 17) return "day";
+    if (hour >= 17 && hour < 21) return "dusk";
+    return "night";
+  }
+
   root.PixelCore = {
     toISO,
     fromISO,
@@ -90,7 +103,9 @@
     addDaysIso,
     startOfWeek,
     plural,
-    isSeriesActiveOn
+    isSeriesActiveOn,
+    skyPhaseFor,
+    SKY_PHASES
   };
   if (typeof module !== "undefined" && module.exports) module.exports = root.PixelCore;
 })(typeof window !== "undefined" ? window : globalThis);

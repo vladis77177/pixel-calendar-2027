@@ -54,6 +54,7 @@ public class MainActivity extends BridgeActivity {
 
     private void reveal(WebView webView) {
         if (webView.getAlpha() >= 1f) return;
-        webView.animate().alpha(1f).setDuration(120L).start();
+        // Без анимации: плавное проявление — это и есть видимая «белая затухающая» вспышка.
+        webView.setAlpha(1f);
     }
 }

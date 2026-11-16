@@ -24,6 +24,9 @@
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
   <link rel="manifest" href="manifest.webmanifest">
   <!--BUILD_INFO-->
+  <!-- Фаза неба до первой отрисовки: иначе виден дневной кадр и переход в ночь. -->
+  <script src="core.js"></script>
+  <script src="boot.js"></script>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Календарь">
@@ -738,7 +741,6 @@
     <p class="empty-note">Добавь первое дело — и день сразу станет чуточку интереснее.</p>
   </template>
 
-  <script src="core.js" defer></script>
   <script src="update.js" defer></script>
   <script src="sync.js" defer></script>
   <script src="series-stats.js" defer></script>

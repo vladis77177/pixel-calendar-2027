@@ -356,14 +356,8 @@
   }
 
   function resolveDaytime() {
-    const mode = data.settings.sky;
-    if (mode && mode !== "auto") return mode;
     const now = new Date();
-    const hour = now.getHours() + now.getMinutes() / 60;
-    if (hour >= 5 && hour < 8) return "dawn";
-    if (hour >= 8 && hour < 17) return "day";
-    if (hour >= 17 && hour < 21) return "dusk";
-    return "night";
+    return window.PixelCore.skyPhaseFor(now.getHours() + now.getMinutes() / 60, data.settings.sky);
   }
 
   function applyDaytime() {

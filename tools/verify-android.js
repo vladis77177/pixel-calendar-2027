@@ -133,6 +133,19 @@ check(
   mainActivity.includes("postVisualStateCallback"),
   "MainActivity must reveal the WebView at its first frame, not before"
 );
+const launchStyles = read("res/values/styles.xml");
+check(
+  launchStyles.includes("windowSplashScreenBackground"),
+  "Launch theme must set windowSplashScreenBackground — the platform otherwise paints its own background"
+);
+check(
+  launchStyles.includes("name=\"android:colorBackground\""),
+  "Both app themes must set android:colorBackground to the sky colour, not white"
+);
+check(
+  launchStyles.includes("postSplashScreenTheme"),
+  "Launch theme must declare postSplashScreenTheme = AppTheme.NoActionBar"
+);
 
 const appJs = fs.readFileSync(path.join(ROOT, "app.js"), "utf8");
 const payloadStart = appJs.indexOf("function buildWidgetPayload");

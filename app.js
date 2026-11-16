@@ -3575,14 +3575,8 @@
 
   // Фаза суток: 5–8 рассвет, 8–17 день, 17–21 закат, иначе ночь.
   function resolveDaytime() {
-    const mode = state.settings.sky;
-    if (mode !== "auto") return SKY_MODES.includes(mode) ? mode : "day";
     const now = new Date();
-    const hour = now.getHours() + now.getMinutes() / 60;
-    if (hour >= 5 && hour < 8) return "dawn";
-    if (hour >= 8 && hour < 17) return "day";
-    if (hour >= 17 && hour < 21) return "dusk";
-    return "night";
+    return window.PixelCore.skyPhaseFor(now.getHours() + now.getMinutes() / 60, state.settings.sky);
   }
 
   function applyDaytime() {

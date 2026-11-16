@@ -151,3 +151,23 @@ test("правило повтора совпадает с notifications.js", () 
     }
   }
 });
+
+test("skyPhaseFor: расписание суток", () => {
+  assert.equal(core.skyPhaseFor(4.99, "auto"), "night");
+  assert.equal(core.skyPhaseFor(5, "auto"), "dawn");
+  assert.equal(core.skyPhaseFor(7.99, "auto"), "dawn");
+  assert.equal(core.skyPhaseFor(8, "auto"), "day");
+  assert.equal(core.skyPhaseFor(16.99, "auto"), "day");
+  assert.equal(core.skyPhaseFor(17, "auto"), "dusk");
+  assert.equal(core.skyPhaseFor(20.99, "auto"), "dusk");
+  assert.equal(core.skyPhaseFor(21, "auto"), "night");
+  assert.equal(core.skyPhaseFor(0, "auto"), "night");
+});
+
+test("skyPhaseFor: фиксированная тема сильнее времени", () => {
+  assert.equal(core.skyPhaseFor(12, "night"), "night");
+  assert.equal(core.skyPhaseFor(23, "day"), "day");
+  assert.equal(core.skyPhaseFor(12, "dusk"), "dusk");
+  assert.equal(core.skyPhaseFor(12, "мусор"), "day");
+  assert.equal(core.skyPhaseFor(NaN, "auto"), "day");
+});
