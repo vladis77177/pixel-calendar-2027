@@ -52,8 +52,9 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Стратегии: навигация — сначала сеть (свежий index.html и плашка обновления),
-// API синхронизации не кэшируется вообще, статика — сначала кэш.
+// Стратегии: навигация — кэш сразу + обновление в фоне (белый кадр окна, пока ждём
+// сеть, и есть вспышка при открытии PWA), API синхронизации не кэшируется вообще,
+// статика — сначала кэш.
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
@@ -63,23 +64,7 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/")) return;
 
   if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
-          }
-          return response;
-        })
-        .catch(async () => {
-          const cached = await caches.match(request);
-          if (cached) return cached;
-          const fallback = await caches.match("./index.html");
-          if (fallback) return fallback;
-          return offline();
-        })
-    );
+    event.respondWith(handleNavigation(event));
     return;
   }
 
@@ -98,6 +83,29 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+
+// Отдаём сохранённый документ сразу (первый кадр без ожидания сети), свежую копию
+// кладём в кэш для следующего открытия. Без кэша ждём сеть, как раньше.
+function handleNavigation(event) {
+  const request = event.request;
+  const network = fetch(request).then((response) => {
+    if (response && response.ok) {
+      const copy = response.clone();
+      caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
+    }
+    return response;
+  });
+  event.waitUntil(network.then(() => {}).catch(() => {}));
+  return caches.match(request, { ignoreSearch: true }).then((cached) => {
+    if (cached) return cached;
+    return network.catch(async () => {
+      const fallback = await caches.match("./index.html");
+      if (fallback) return fallback;
+      return offline();
+    });
+  });
+}
+
 
 function offline() {
   return new Response("Нет соединения", {

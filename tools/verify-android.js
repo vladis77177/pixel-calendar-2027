@@ -125,6 +125,14 @@ check(
 );
 const bridge = read(`java/${PACKAGE.split(".").join("/")}/WidgetBridgePlugin.java`);
 check(bridge.includes("consumeToggles"), "WidgetBridgePlugin must expose consumeToggles");
+check(
+  Boolean(CONFIG.android && CONFIG.android.backgroundColor),
+  "capacitor.config.json must set android.backgroundColor — otherwise the WebView is white until the page paints (launch flash)"
+);
+check(
+  mainActivity.includes("postVisualStateCallback"),
+  "MainActivity must reveal the WebView at its first frame, not before"
+);
 
 const appJs = fs.readFileSync(path.join(ROOT, "app.js"), "utf8");
 const payloadStart = appJs.indexOf("function buildWidgetPayload");
