@@ -445,6 +445,243 @@ function isoToday() {
     check("поиск: находит дело по подстроке", searchCount.startsWith("цветы|") && searchCount.includes("1"), searchCount);
     await cdp.eval(`(() => { const dialog = document.querySelector("#searchDialog"); if (dialog.open) dialog.close(); return true; })()`);
 
+    // 11. Отмена удаления: тост с кнопкой должен лежать поверх открытого окна дня.
+    await cdp.eval(`(() => {
+      document.querySelector('.day-cell[data-date="${today}"]').click();
+      return true;
+    })()`);
+    await cdp.waitFor(`document.querySelector("#dayDialog").open === true`, "окно дня открылось для отмены удаления");
+    await cdp.eval(`(() => {
+      document.querySelector("#taskInput").value = "Смоук: отменить меня";
+      document.querySelector("#taskTime").value = "11:00";
+      document.querySelector("#taskForm").requestSubmit();
+      return true;
+    })()`);
+    await cdp.waitFor(
+      `(${readStore})?.tasks?.[${JSON.stringify(today)}]?.some((task) => task.text === "Смоук: отменить меня")`,
+      "дело для отмены создано"
+    );
+    await cdp.eval(`(() => {
+      const row = [...document.querySelectorAll("#taskList .task-item")].find((node) => node.textContent.includes("отменить меня"));
+      row.querySelector('[data-action="delete"]').click();
+      return true;
+    })()`);
+    await cdp.waitFor(
+      `(${readStore})?.tasks?.[${JSON.stringify(today)}]?.some((task) => task.text === "Смоук: отменить меня" && task.deletedAt > 0)`,
+      "дело удалено могилой перед отменой"
+    );
+    check("отмена удаления: тост предлагает «Отменить»", await cdp.eval(`(() => {
+      const button = document.querySelector("#toastAction");
+      return Boolean(button) && !button.hidden && button.textContent.trim() === "Отменить";
+    })()`));
+    // Регрессия слоёв: модальное окно живёт в top layer, тост обязан быть выше него.
+    check("отмена удаления: кнопка не перекрыта окном дня", await cdp.eval(`(() => {
+      const button = document.querySelector("#toastAction");
+      const rect = button.getBoundingClientRect();
+      const top = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      return Boolean(top) && (top === button || button.contains(top));
+    })()`));
+    await cdp.eval(`document.querySelector("#toastAction").click(); true`);
+    await cdp.waitFor(
+      `(${readStore})?.tasks?.[${JSON.stringify(today)}]?.some((task) => task.text === "Смоук: отменить меня" && !task.deletedAt)`,
+      "запись вернулась из могилы"
+    );
+    check("отмена удаления: дело снова в списке", await cdp.eval(
+      `[...document.querySelectorAll("#taskList .task-item")].some((node) => node.textContent.includes("отменить меня"))`
+    ));
+    check("отмена удаления: тост подтверждает возврат", await cdp.eval(
+      `document.querySelector("#toastText").textContent.includes("Удаление отменено")`
+    ));
+
+    // 12. «Перенести незавершённое»: едет только незавершённое, напоминание пересчитано.
+    const tomorrow = await cdp.eval(`(() => {
+      const date = new Date();
+      date.setDate(date.getDate() + 1);
+      const pad = (value) => String(value).padStart(2, "0");
+      return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate());
+    })()`);
+    await cdp.eval(`(() => {
+      document.querySelector("#taskInput").value = "Смоук: готово";
+      document.querySelector("#taskTime").value = "";
+      document.querySelector("#taskForm").requestSubmit();
+      return true;
+    })()`);
+    await cdp.waitFor(
+      `(${readStore})?.tasks?.[${JSON.stringify(today)}]?.some((task) => task.text === "Смоук: готово")`,
+      "выполненное дело создано"
+    );
+    await cdp.eval(`(() => {
+      const row = [...document.querySelectorAll("#taskList .task-item")].find((node) => node.textContent.includes("Смоук: готово"));
+      row.querySelector(".task-check").click();
+      return true;
+    })()`);
+    await cdp.waitFor(
+      `(${readStore})?.tasks?.[${JSON.stringify(today)}]?.some((task) => task.text === "Смоук: готово" && task.done === true)`,
+      "выполненное дело отмечено"
+    );
+    await cdp.eval(`(() => {
+      document.querySelector("#taskInput").value = "Смоук: зарядка";
+      const repeat = document.querySelector("#taskRepeat");
+      repeat.value = "daily";
+      repeat.dispatchEvent(new Event("change", { bubbles: true }));
+      document.querySelector("#taskTime").value = "08:00";
+      document.querySelector("#taskForm").requestSubmit();
+      return true;
+    })()`);
+    await cdp.waitFor(`(${readStore})?.series?.some((item) => item.text === "Смоук: зарядка")`, "серия для переноса создана");
+    const movableId = await cdp.eval(
+      `(${readStore}).tasks[${JSON.stringify(today)}].find((task) => task.text === "Смоук: отменить меня").id`
+    );
+    check("перенос: кнопка видна при незавершённых делах", await cdp.eval(
+      `(() => { const button = document.querySelector("#moveTomorrowBtn"); return Boolean(button) && !button.hidden; })()`
+    ));
+    await cdp.eval(`document.querySelector("#moveTomorrowBtn").click(); true`);
+    await cdp.waitFor(
+      `(${readStore})?.tasks?.[${JSON.stringify(tomorrow)}]?.some((task) => task.id === ${JSON.stringify(movableId)})`,
+      "незавершённое дело переехало на завтра"
+    );
+    const movedTask = await cdp.eval(
+      `(${readStore}).tasks[${JSON.stringify(tomorrow)}].find((task) => task.id === ${JSON.stringify(movableId)})`
+    );
+    check("перенос: напоминание пересчитано на новый день", Boolean(
+      movedTask && movedTask.time === "11:00" &&
+      new Date(movedTask.remindAt).getTime() === new Date(`${tomorrow}T11:00:00`).getTime()
+    ), JSON.stringify(movedTask));
+    check("перенос: выполненное дело осталось на месте", await cdp.eval(
+      `(${readStore})?.tasks?.[${JSON.stringify(today)}]?.some((task) => task.text === "Смоук: готово" && task.done === true) === true`
+    ));
+    check("перенос: в старом дне незавершённых не осталось", await cdp.eval(
+      `((${readStore})?.tasks?.[${JSON.stringify(today)}] || []).every((task) => task.deletedAt || task.done)`
+    ));
+    check("перенос: день серии не переехал", await cdp.eval(
+      `[...document.querySelectorAll("#taskList .task-item")].some((node) => node.textContent.includes("Смоук: зарядка"))`
+    ));
+    check("перенос: кнопка скрылась, когда переносить нечего", await cdp.eval(
+      `document.querySelector("#moveTomorrowBtn").hidden === true`
+    ));
+
+    // 13. Удаление дня серии и его отмена через тот же тост.
+    await cdp.eval(`(() => {
+      const row = [...document.querySelectorAll("#taskList .task-item")].find((node) => node.textContent.includes("Смоук: зарядка"));
+      row.querySelector('[data-action="delete"]').click();
+      return true;
+    })()`);
+    await cdp.waitFor(
+      `Boolean(document.querySelector('#taskList [data-action="delete-occurrence"]'))`,
+      "подтверждение удаления дня серии появилось"
+    );
+    await cdp.eval(`document.querySelector('#taskList [data-action="delete-occurrence"]').click(); true`);
+    await cdp.waitFor(
+      `(${readStore})?.series?.some((item) => item.text === "Смоук: зарядка" && item.exceptions?.[${JSON.stringify(today)}]?.deleted === true)`,
+      "день серии помечен удалённым"
+    );
+    check("серия: удаление дня не трогает саму серию", await cdp.eval(
+      `(${readStore}).series.some((item) => item.text === "Смоук: зарядка" && !item.deletedAt)`
+    ));
+    check("серия: удалённый день исчез из списка", await cdp.eval(
+      `![...document.querySelectorAll("#taskList .task-item")].some((node) => node.textContent.includes("Смоук: зарядка"))`
+    ));
+    await cdp.eval(`document.querySelector("#toastAction").click(); true`);
+    await cdp.waitFor(
+      `(${readStore})?.series?.some((item) => item.text === "Смоук: зарядка" && item.exceptions?.[${JSON.stringify(today)}]?.deleted === false)`,
+      "день серии вернулся"
+    );
+    check("серия: «Отменить» возвращает день", await cdp.eval(
+      `[...document.querySelectorAll("#taskList .task-item")].some((node) => node.textContent.includes("Смоук: зарядка"))`
+    ));
+
+    // 14. Поиск по двум символам и очистка поля.
+    await cdp.eval(`document.querySelector("#searchBtn").click(); true`);
+    await cdp.waitFor(`document.querySelector("#searchDialog").open === true`, "поиск открылся повторно");
+    await cdp.eval(`(() => {
+      const input = document.querySelector("#searchInput");
+      input.value = "за";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      return true;
+    })()`);
+    await cdp.waitFor(
+      `document.querySelectorAll("#searchResults .search-result, #searchResults li").length > 0`,
+      "поиск по двум символам что-то нашёл"
+    );
+    check("поиск: два символа дают результаты", await cdp.eval(
+      `document.querySelectorAll("#searchResults .search-result, #searchResults li").length > 0`
+    ));
+    await cdp.eval(`(() => {
+      const input = document.querySelector("#searchInput");
+      input.value = "";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      return true;
+    })()`);
+    await cdp.waitFor(
+      `document.querySelectorAll("#searchResults .search-result").length > 0`,
+      "пустой запрос показывает все дела"
+    );
+    check("поиск: пустое поле показывает все дела", await cdp.eval(
+      `!document.querySelector("#searchResults .search-empty") && document.querySelector("#searchCount").textContent.includes("Найдено")`
+    ), await cdp.eval(`document.querySelector("#searchCount").textContent.trim()`));
+    await cdp.eval(`(() => { const dialog = document.querySelector("#searchDialog"); if (dialog.open) dialog.close(); return true; })()`);
+
+    // 15. Настройки: начало недели пишется в хранилище сразу, без перезагрузки.
+    await cdp.eval(`(() => { const dialog = document.querySelector("#dayDialog"); if (dialog.open) dialog.close(); return true; })()`);
+    await cdp.eval(`document.querySelector("#settingsBtn").click(); true`);
+    await cdp.waitFor(`document.querySelector("#settingsDialog").open === true`, "настройки открылись для проверки недели");
+    const chosenWeekStart = await cdp.eval(`(() => {
+      const select = document.querySelector("#weekStartSelect");
+      select.value = select.value === "0" ? "1" : "0";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      return Number(select.value);
+    })()`);
+    check("настройки: начало недели сохраняется в хранилище", await cdp.eval(
+      `(${readStore})?.settings?.weekStart === ${chosenWeekStart}`
+    ), `выбрано ${chosenWeekStart}`);
+    await cdp.eval(`(() => { const dialog = document.querySelector("#settingsDialog"); if (dialog.open) dialog.close(); return true; })()`);
+    await cdp.waitFor(`document.querySelector("#settingsDialog").open === false`, "настройки закрылись");
+
+    // 16. Ярлык долгого нажатия: ?add=tomorrow открывает завтрашний день с курсором в поле.
+    await cdp.send("Page.navigate", { url: `http://127.0.0.1:${serverPort}/index.html?add=tomorrow` });
+    await cdp.waitFor(
+      `Boolean(document.querySelector("#dayDialog")) && document.querySelector("#dayDialog").open === true`,
+      "ярлык открыл окно дня"
+    );
+    check("ярлык ?add=tomorrow очищает адрес", await cdp.eval(`window.location.search === ""`));
+    check("ярлык ?add=tomorrow ставит курсор в поле дела", await cdp.eval(
+      `Boolean(document.activeElement) && document.activeElement.id === "taskInput"`
+    ));
+    await cdp.eval(`(() => {
+      document.querySelector("#taskInput").value = "Смоук: ярлык";
+      document.querySelector("#taskForm").requestSubmit();
+      return true;
+    })()`);
+    await cdp.waitFor(
+      `(${readStore})?.tasks?.[${JSON.stringify(tomorrow)}]?.some((task) => task.text === "Смоук: ярлык")`,
+      "ярлык записал дело на завтра"
+    );
+    check("ярлык ?add=tomorrow пишет дело в завтрашний день", await cdp.eval(
+      `(${readStore}).tasks[${JSON.stringify(tomorrow)}].some((task) => task.text === "Смоук: ярлык")`
+    ));
+
+    // 17. Естественный ввод: дата, время и текст разбираются из одной строки.
+    await cdp.eval(`(() => {
+      const dialog = document.querySelector("#dayDialog");
+      if (dialog && dialog.open) dialog.close();
+      const input = document.querySelector("#quickAddInput");
+      input.value = "завтра в 15:00 позвонить маме";
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      document.querySelector("#quickAddForm").requestSubmit();
+      return true;
+    })()`);
+    await cdp.waitFor(
+      `(${readStore})?.tasks?.[${JSON.stringify(tomorrow)}]?.some((task) => task.text === "позвонить маме")`,
+      "естественный ввод создал дело"
+    );
+    const parsedTask = await cdp.eval(
+      `(${readStore}).tasks[${JSON.stringify(tomorrow)}].find((task) => task.text === "позвонить маме")`
+    );
+    check("естественный ввод: время и напоминание из строки", Boolean(
+      parsedTask && parsedTask.time === "15:00" &&
+      new Date(parsedTask.remindAt).getTime() === new Date(`${tomorrow}T15:00:00`).getTime()
+    ), JSON.stringify(parsedTask));
+
     check("ошибок в консоли нет", consoleErrors.length === 0, consoleErrors.join(" | "));
     check("падений JS нет", exceptions.length === 0, exceptions.join(" | "));
   } catch (error) {

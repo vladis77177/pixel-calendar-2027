@@ -1993,13 +1993,16 @@ const TOAST_ACTION_MS = 6000;
   }
 
   function addQuickTask(text) {
-    const clean = text.trim().replace(/\s+/g, " ");
+    // Дата и время разбираются офлайн-парсером: «завтра в 15:00 позвонить маме».
+    const parsed = window.PixelCore.parseQuickInput(text, new Date());
+    const clean = parsed.text.trim().replace(/\s+/g, " ");
     if (!clean) {
       showToast("Напиши, что нужно сделать");
       els.quickAddInput.focus();
       return;
     }
-    const iso = state.selectedDate || toISO(startOfDay(new Date()));
+    const iso = parsed.date || state.selectedDate || toISO(startOfDay(new Date()));
+    const time = parsed.time;
     if (!state.tasks[iso]) state.tasks[iso] = [];
     state.tasks[iso].push({
       id: makeId(),
@@ -2008,15 +2011,15 @@ const TOAST_ACTION_MS = 6000;
       createdAt: Date.now(),
       updatedAt: Date.now(),
       deletedAt: null,
-      time: null,
-      remindAt: null
+      time,
+      remindAt: remindTimestamp(iso, time)
     });
     saveStore();
     els.quickAddInput.value = "";
     renderProgress();
     renderCalendar(false);
     renderQuickAddDate();
-    showToast(`Добавлено на ${formatLongDate(fromISO(iso))}`);
+    showToast(`${time ? `${time} · ` : ""}Добавлено на ${formatLongDate(fromISO(iso))}`);
     els.quickAddInput.focus();
   }
 
