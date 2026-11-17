@@ -129,6 +129,13 @@ check(
   Boolean(CONFIG.android && CONFIG.android.backgroundColor),
   "capacitor.config.json must set android.backgroundColor — otherwise the WebView is white until the page paints (launch flash)"
 );
+// WebView грузит приложение с https://localhost (server.androidScheme), а синхронизация
+// ходит на http://192.168.x.x:8787. Без allowMixedContent Chromium блокирует такой запрос,
+// и в приложении видно «Сервер недоступен: Failed to fetch».
+check(
+  Boolean(CONFIG.android && CONFIG.android.allowMixedContent === true),
+  "capacitor.config.json must set android.allowMixedContent = true — otherwise LAN sync over plain HTTP is blocked as mixed content (Failed to fetch)"
+);
 check(
   mainActivity.includes("postVisualStateCallback"),
   "MainActivity must reveal the WebView at its first frame, not before"

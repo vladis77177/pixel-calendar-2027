@@ -3,7 +3,7 @@
   "appName": "Пиксельный календарь",
   "webDir": "www",
   "android": {
-    "allowMixedContent": false,
+    "allowMixedContent": true,
     "backgroundColor": "#82d4fb"
   },
   "server": {
