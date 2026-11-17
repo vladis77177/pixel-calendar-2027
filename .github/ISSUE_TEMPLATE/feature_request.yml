@@ -1,0 +1,31 @@
+name: Идея
+description: Чего не хватает или что стоит улучшить
+title: "[Идея] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Идеи приветствуются. Правило проекта: календарь остаётся бесплатным и без рекламы,
+        поэтому всё, что улучшает ежедневную работу с ним, в приоритете.
+  - type: textarea
+    id: idea
+    attributes:
+      label: Что хочется
+      description: Опишите задачу, которую сейчас приходится делать руками или неудобно.
+      placeholder: Хочется одним движением переносить дело на неделю вперёд, а не выбирать дату в календаре.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Зачем и как часто
+      description: Как часто это нужно и как вы справляетесь сейчас.
+    validations:
+      required: false
+  - type: textarea
+    id: how
+    attributes:
+      label: Как это могло бы выглядеть
+      description: Необязательно. Набросок, кнопка, жест — что угодно.
+    validations:
+      required: false

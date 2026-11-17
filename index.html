@@ -142,6 +142,9 @@
     <symbol id="i-external" viewBox="0 0 24 24">
       <path d="M14 4h6v6M20 4l-8 8M18 14v6H4V6h6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square" stroke-linejoin="miter"/>
     </symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24">
+      <path d="M12 20.5 3.7 12.2a5 5 0 0 1 7-7.1L12 6.4l1.3-1.3a5 5 0 0 1 7 7.1Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="miter"/>
+    </symbol>
   </svg>
 
   <div class="page-shell">
@@ -677,6 +680,34 @@
           </div>
           <pre class="perf-report" id="perfReport" hidden></pre>
           <p class="settings-note settings-build" id="settingsBuild">Сборка: локальная</p>
+        </section>
+
+        <section class="settings-section" id="supportSection">
+          <h4 class="settings-title">Помощь и поддержка</h4>
+          <p class="settings-note">Календарь бесплатный: без рекламы, подписок и платных функций. Если что-то сломалось или появилась идея — напишите, приложение развивается по таким письмам.</p>
+          <div class="settings-actions">
+            <a class="pixel-btn settings-btn link-btn" id="reportBugBtn" href="https://github.com/vladis77177/pixel-calendar-2027/issues/new?template=bug_report.yml" target="_blank" rel="noopener">
+              <svg class="icon"><use href="#i-flag"></use></svg>
+              <span>Сообщить о проблеме</span>
+            </a>
+            <a class="pixel-btn settings-btn link-btn" id="suggestIdeaBtn" href="https://github.com/vladis77177/pixel-calendar-2027/issues/new?template=feature_request.yml" target="_blank" rel="noopener">
+              <svg class="icon"><use href="#i-sparkle"></use></svg>
+              <span>Предложить идею</span>
+            </a>
+            <a class="pixel-btn settings-btn link-btn" id="mailAuthorBtn" href="mailto:vlad-02_2014@mail.ru">
+              <svg class="icon"><use href="#i-external"></use></svg>
+              <span>Написать на почту</span>
+            </a>
+          </div>
+          <p class="settings-note">Почта для тех, у кого нет аккаунта GitHub: <span class="support-email">vlad-02_2014@mail.ru</span>. В письме будет версия приложения — так проще найти причину.</p>
+          <div class="settings-actions" id="supportDonateRow" hidden>
+            <button class="pixel-btn settings-btn" id="supportDonateBtn" type="button" aria-expanded="false" aria-controls="supportRails">
+              <svg class="icon"><use href="#i-heart"></use></svg>
+              <span>Поддержать проект</span>
+            </button>
+          </div>
+          <div class="support-rails" id="supportRails" hidden></div>
+          <p class="settings-note support-thanks" id="supportThanks" hidden>Спасибо! Поддержка уходит на сервер, домен и следующие версии. Функции за деньги не продаются — всё перечисленное есть у всех.</p>
         </section>
 
         <section class="settings-section settings-danger">

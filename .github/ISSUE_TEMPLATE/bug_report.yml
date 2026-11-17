@@ -1,0 +1,49 @@
+name: Проблема
+description: Что-то сломалось или работает не так
+title: "[Проблема] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо, что написали. Чем точнее шаги и версия, тем быстрее найдём причину.
+        Скриншот или запись экрана сильно помогают. Если аккаунта GitHub нет — письмо на vlad-02_2014@mail.ru.
+  - type: textarea
+    id: what
+    attributes:
+      label: Что произошло
+      description: Что вы сделали, что ожидали увидеть и что получилось на самом деле.
+      placeholder: Нажал «Готово» у дела с временем — напоминание не пришло, хотя дело отмечено.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Как повторить
+      placeholder: |
+        1. Открыть день 20 ноября
+        2. Добавить дело на 09:00
+        3. ...
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Версия
+      description: В настройках, внизу раздела «Диагностика», строка «Сборка».
+      placeholder: 0.13.0 · APK
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Устройство и браузер
+      placeholder: Android 14, APK с GitHub / Chrome на Windows 11, http://localhost:8787
+    validations:
+      required: false
+  - type: textarea
+    id: extra
+    attributes:
+      label: Скриншот и подробности
+      description: Картинку можно вставить прямо в это поле.
+    validations:
+      required: false

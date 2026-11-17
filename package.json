@@ -3,6 +3,7 @@
   "version": "0.13.0",
   "private": true,
   "description": "Пиксельный календарь 2027: веб-версия и Android-приложение на Capacitor.",
+  "license": "MIT",
   "scripts": {
     "build:web": "node tools/build-web.js",
     "check": "node tools/check-js.js",
