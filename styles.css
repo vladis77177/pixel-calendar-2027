@@ -501,7 +501,7 @@ html[data-daytime="night"] .today-chip::after {
 /* Подложка выше гасит бумагу сильнее, чем текст (#fff8e7 → #a09070, а текст
    #6b5432 → #443418), поэтому в панели ночью оставалось 3.0–3.8:1. Дожимаем
    сам текст: он темнее подложки и под ней остаётся ≥4.5:1. Схему слоя не трогаем. */
-html[data-daytime="night"] .view-tab,
+html[data-daytime="night"] .view-tab:not(.is-active),
 html[data-daytime="night"] .period-kicker,
 html[data-daytime="night"] .weekday-name,
 html[data-daytime="night"] .day-number,
@@ -533,8 +533,9 @@ html[data-daytime="night"] .dialog-eyebrow {
   color: #fff8e7;
 }
 
-/* Панель вкладок темнее бумаги, поэтому там текст ещё темнее. */
-html[data-daytime="night"] .view-tab {
+/* Панель вкладок темнее бумаги, поэтому там текст ещё темнее. Выбранный вид
+   не трогаем: у него текст как у зелёной кнопки. */
+html[data-daytime="night"] .view-tab:not(.is-active) {
   color: #261b0b;
 }
 
@@ -575,21 +576,12 @@ html[data-daytime="night"] .mini-day.is-today {
   color: #fff8e7;
 }
 
-/* Выбранный вид ночью — кремовая клавиша дневной яркости (решение владельца:
-   светло-зелёная была слишком яркой). Под множительным слоем любая светлая
-   заливка выцветает, поэтому таб поднимается над слоем тем же приёмом, что у
-   кнопок быстрого ввода ниже. Тёмно-зелёный текст на креме — 5.43:1. */
+/* Ночью выбранный вид остаётся тем же зелёным, что зелёные кнопки: под
+   множительным слоем зелень гаснет до (70,114,37), где тёмный текст даёт лишь
+   2.5:1. Поэтому таб поднимается над слоем тем же приёмом, что кнопки ниже. */
 html[data-daytime="night"] .view-tab.is-active {
-  --btn-top: #fffdf7;
-  --btn-bottom: var(--green-light);
   position: relative;
   z-index: 21;
-  background: var(--paper);
-  color: var(--green-dark);
-  box-shadow:
-    inset 0 3px 0 var(--btn-top),
-    inset 0 -2px 0 var(--btn-bottom),
-    0 3px 0 var(--line);
 }
 
 /* Зелёные кнопки ночью остаются зелёными, как днём (решение пользователя).
@@ -1282,17 +1274,17 @@ html[data-holiday="on"] .island-grass {
   color: var(--ink);
 }
 
-/* Выбранный вид — светлая пиксельная клавиша, а не тёмная плашка: заливка
-   светло-зелёная из палитры, текст тёмно-зелёный (11.6:1), «нажатие» показано
-   фасками кнопок проекта. Размеры прежние: высоту задаёт .view-tab. */
+/* Выбранный вид — та же зелёная клавиша, что «+ Добавить» (.add-btn) и кнопка
+   быстрого ввода (.quick-add-btn), только тень на 3px: ряд табов низкий.
+   Размеры прежние: высоту задаёт .view-tab. */
 .view-tab.is-active {
-  --btn-top: var(--paper);
-  --btn-bottom: var(--green-light);
-  background: var(--green-pale);
+  --btn-top: #b9f397;
+  --btn-bottom: #4d9b35;
+  background: var(--green);
   border-color: var(--line);
-  color: #1f3a12;
+  color: #17310f;
   box-shadow:
-    inset 0 3px 0 var(--btn-top),
+    inset 0 2px 0 var(--btn-top),
     inset 0 -3px 0 var(--btn-bottom),
     0 3px 0 var(--line);
   transform: translateY(-1px);
