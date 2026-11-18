@@ -12,9 +12,24 @@ const { mergeStates, migrateState, pruneTombstones } = require("../sync.js");
 
 const ROOT = path.resolve(__dirname, "..");
 const WWW = path.join(ROOT, "www");
+// Дела не должны уезжать вместе с папкой проекта (копирование/архив/перенос каталога),
+// поэтому по умолчанию состояние живёт в пользовательских данных ОС.
+// Прежнее место (sync-server/data) подхватывается при первом запуске и копируется сюда.
+function defaultDataDir() {
+  const home = os.homedir();
+  if (process.platform === "win32") {
+    return path.join(process.env.LOCALAPPDATA || path.join(home, "AppData", "Local"), "pixel-calendar-2027-sync");
+  }
+  if (process.platform === "darwin") {
+    return path.join(home, "Library", "Application Support", "pixel-calendar-2027-sync");
+  }
+  return path.join(process.env.XDG_DATA_HOME || path.join(home, ".local", "share"), "pixel-calendar-2027-sync");
+}
+
+const LEGACY_DATA_DIR = path.join(ROOT, "data");
 const DATA_DIR = process.env.SYNC_DATA_DIR
   ? path.resolve(process.env.SYNC_DATA_DIR)
-  : path.join(ROOT, "data");
+  : defaultDataDir();
 const STATE_FILE = path.join(DATA_DIR, "state.json");
 const BACKUP_FILE = path.join(DATA_DIR, "state.bak.json");
 const BACKUP_DIR = path.join(DATA_DIR, "backups");
@@ -147,6 +162,26 @@ function stateCandidates() {
   return list;
 }
 
+// Первый запуск после смены места хранения: копируем состояние и код подключения
+// из прежней папки проекта. Копия, а не перенос — если что-то пойдёт не так,
+// исходные файлы остаются на месте.
+function adoptLegacyData() {
+  if (process.env.SYNC_DATA_DIR) return;
+  if (fs.existsSync(STATE_FILE) || fs.existsSync(TOKEN_FILE)) return;
+  if (!fs.existsSync(LEGACY_DATA_DIR)) return;
+  const names = ["state.json", "state.bak.json", "token.txt"];
+  if (!names.some((name) => fs.existsSync(path.join(LEGACY_DATA_DIR, name)))) return;
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  names.forEach((name) => {
+    const from = path.join(LEGACY_DATA_DIR, name);
+    if (fs.existsSync(from)) fs.copyFileSync(from, path.join(DATA_DIR, name));
+  });
+  const legacyBackups = path.join(LEGACY_DATA_DIR, "backups");
+  if (fs.existsSync(legacyBackups)) fs.cpSync(legacyBackups, BACKUP_DIR, { recursive: true });
+  console.log(`Данные перенесены из папки проекта: ${LEGACY_DATA_DIR} → ${DATA_DIR}`);
+}
+
+adoptLegacyData();
 const token = loadToken();
 let serverState = loadState();
 
@@ -234,6 +269,51 @@ function readBody(req, callback) {
   req.on("error", (error) => callback(error));
 }
 
+// Что изменилось после слияния — чтобы «тихо перезаписало 300 задач» было видно
+// в консоли сервера сразу, а не выяснялось по пропавшим делам.
+function recordVersions(state) {
+  const versions = new Map();
+  const tasks = (state && state.tasks) || {};
+  Object.keys(tasks).forEach((iso) => {
+    (tasks[iso] || []).forEach((task) => {
+      if (task && task.id) {
+        versions.set(`t:${task.id}`, {
+          updatedAt: Number(task.updatedAt) || 0,
+          deleted: Boolean(task.deletedAt)
+        });
+      }
+    });
+  });
+  ((state && state.series) || []).forEach((series) => {
+    if (series && series.id) {
+      versions.set(`s:${series.id}`, {
+        updatedAt: Number(series.updatedAt) || 0,
+        deleted: Boolean(series.deletedAt)
+      });
+    }
+  });
+  versions.set("settings", {
+    updatedAt: Number(state && state.settings && state.settings.updatedAt) || 0,
+    deleted: false
+  });
+  return versions;
+}
+
+function countChanges(before, after) {
+  const old = recordVersions(before);
+  const next = recordVersions(after);
+  const changes = { tasks: 0, series: 0, settings: 0, deleted: 0 };
+  next.forEach((entry, key) => {
+    const previous = old.get(key);
+    if (previous && previous.updatedAt === entry.updatedAt) return;
+    if (key === "settings") changes.settings += 1;
+    else if (key.startsWith("s:")) changes.series += 1;
+    else changes.tasks += 1;
+    if (entry.deleted) changes.deleted += 1;
+  });
+  return changes;
+}
+
 function handleApi(req, res) {
   const ip = (req.socket && req.socket.remoteAddress) || "unknown";
   if (authLocked(ip)) {
@@ -287,6 +367,16 @@ function handleApi(req, res) {
       console.warn(`Синхронизация: подрезано ${clamped.cut} отметок времени из будущего`);
     }
     const merged = mergeStates(serverState, clamped.state);
+    const changes = countChanges(serverState, merged);
+    if (changes.tasks || changes.series || changes.settings) {
+      const deleted = changes.deleted ? `, из них удалений ${changes.deleted}` : "";
+      console.log(
+        `Синхронизация: принято — дел ${changes.tasks}${deleted}, ` +
+          `серий ${changes.series}, настроек ${changes.settings}`
+      );
+    } else {
+      console.log("Синхронизация: изменений нет");
+    }
     try {
       persist(merged);
     } catch (writeError) {

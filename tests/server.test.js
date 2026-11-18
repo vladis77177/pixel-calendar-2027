@@ -41,6 +41,21 @@ function waitForServer(child) {
   });
 }
 
+function waitForLog(check, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const started = Date.now();
+    const timer = setInterval(() => {
+      if (check()) {
+        clearInterval(timer);
+        resolve();
+      } else if (Date.now() - started > timeoutMs) {
+        clearInterval(timer);
+        reject(new Error("Строка не появилась в консоли сервера"));
+      }
+    }, 25);
+  });
+}
+
 function makeTask(overrides) {
   return {
     id: "t1",
@@ -91,6 +106,15 @@ test("сервер синхронизации", async (t) => {
       SYNC_BACKUPS: "3"
     },
     stdio: ["ignore", "pipe", "pipe"]
+  });
+
+  // Копим всё, что сервер печатает: по этому тексту проверяем, что правки видны в консоли.
+  let serverLog = "";
+  child.stdout.on("data", (chunk) => {
+    serverLog += chunk.toString();
+  });
+  child.stderr.on("data", (chunk) => {
+    serverLog += chunk.toString();
   });
 
   t.after(() => {
@@ -169,6 +193,37 @@ test("сервер синхронизации", async (t) => {
     });
     const data = await response.json();
     assert.equal(data.tasks["2026-11-10"][0].deletedAt, now);
+  });
+
+  await t.test("в консоль пишется, сколько правок принято", async () => {
+    const mark = serverLog.length;
+    const incoming = body({
+      "2026-11-13": [makeTask({ id: "logged", text: "Видно в консоли", updatedAt: 500 })]
+    });
+    const response = await fetch(`${base}/api/state`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(incoming)
+    });
+    assert.equal(response.status, 200);
+    await waitForLog(() => serverLog.slice(mark).includes("принято"), 3000);
+    const line = serverLog
+      .slice(mark)
+      .split(/\r?\n/)
+      .find((row) => row.includes("принято"));
+    assert.match(line, /дел 1/);
+    assert.match(line, /настроек 0/);
+  });
+
+  await t.test("повторная отправка того же состояния — «изменений нет»", async () => {
+    const mark = serverLog.length;
+    const response = await fetch(`${base}/api/state`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body({}))
+    });
+    assert.equal(response.status, 200);
+    await waitForLog(() => serverLog.slice(mark).includes("изменений нет"), 3000);
   });
 
   await t.test("отметка времени из будущего подрезается, но запись сохраняется", async () => {
@@ -341,4 +396,39 @@ test("защита доступа к серверу синхронизации",
     const withGoodToken = await fetch(base, { headers: { "X-Sync-Token": "a".repeat(32) } });
     assert.equal(withGoodToken.status, 429, "запертый адрес не пропускает даже верный код");
   });
+});
+
+test("по умолчанию данные сервера живут вне папки проекта", async (t) => {
+  const appData = fs.mkdtempSync(path.join(os.tmpdir(), "pixel-appdata-"));
+  const port = await freePort();
+  const child = spawn(process.execPath, [path.join(ROOT, "sync-server", "server.js")], {
+    env: {
+      ...process.env,
+      PORT: String(port),
+      HOST: "127.0.0.1",
+      SYNC_TOKEN: TOKEN,
+      LOCALAPPDATA: appData,
+      XDG_DATA_HOME: appData
+    },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  t.after(() => {
+    child.kill();
+    fs.rmSync(appData, { recursive: true, force: true });
+  });
+  await waitForServer(child);
+
+  const expected = path.join(appData, "pixel-calendar-2027-sync");
+  assert.ok(
+    fs.existsSync(path.join(expected, "token.txt")),
+    `код подключения должен лежать в ${expected}, а не в папке проекта`
+  );
+
+  const response = await fetch(`http://127.0.0.1:${port}/api/state`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Sync-Token": TOKEN },
+    body: JSON.stringify(body({ "2026-11-10": [makeTask({ text: "Вне проекта" })] }))
+  });
+  assert.equal(response.status, 200);
+  assert.ok(fs.existsSync(path.join(expected, "state.json")), "состояние тоже пишется вне проекта");
 });
