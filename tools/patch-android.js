@@ -312,6 +312,20 @@ PERMISSIONS.forEach((name) => {
   );
 });
 
+// Запись в общие «Загрузки» без MediaStore (Android 7–9) требует WRITE_EXTERNAL_STORAGE.
+// На Android 10+ путь идёт через MediaStore и разрешение не нужно, поэтому maxSdkVersion
+// ограничивает его: иначе система просит у пользователя лишнее разрешение.
+manifest = manifest.replace(
+  /<uses-permission android:name="android\.permission\.WRITE_EXTERNAL_STORAGE"[^>]*\/>/,
+  '<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />'
+);
+if (!manifest.includes('android.permission.WRITE_EXTERNAL_STORAGE')) {
+  manifest = manifest.replace(
+    "</manifest>",
+    `    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />\n</manifest>`
+  );
+}
+
 // Код подключения к синхронизации лежит в localStorage WebView, а системный
 // автобэкап уносит его (и дела) в чужое хранилище. Свои данные пользователь
 // выгружает экспортом JSON или синхронизацией — автобэкап выключаем.

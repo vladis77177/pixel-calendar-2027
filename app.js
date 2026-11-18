@@ -119,6 +119,7 @@
     searchBtn: document.getElementById("searchBtn"),
     settingsBtn: document.getElementById("settingsBtn"),
     dialog: document.getElementById("dayDialog"),
+    dialogCard: document.querySelector("#dayDialog .dialog-card"),
     dialogEyebrow: document.getElementById("dialogEyebrow"),
     dialogTitle: document.getElementById("dialogTitle"),
     dialogCloseBtn: document.getElementById("dialogCloseBtn"),
@@ -235,6 +236,12 @@ const TOAST_ACTION_MS = 6000;
   let storageWarned = false;
   let deferredInstallPrompt = null;
   let suppressClickUntil = 0;
+  // Жест в окне дня: свайп по дню или потягивание шапки вниз.
+  let dayGesture = null;
+  let dayGestureTimer = 0;
+  // Подавление клика внутри окна дня — отдельно от календаря: иначе жест в окне
+  // глушил и клик по клетке календаря уже после закрытия окна (гонка на 350 мс).
+  let suppressDialogClickUntil = 0;
   let widgetSyncTimer = 0;
   let lastWidgetPayload = "";
   let probing = false;
@@ -1461,6 +1468,25 @@ const TOAST_ACTION_MS = 6000;
     hideDialog(els.dialog);
   }
 
+  // Свайп по окну дня листает дни тем же openDay, что и клик по клетке: второго
+  // пути правки состояния нет. Через границу месяца двигаем ещё и курсор — иначе
+  // календарь под окном остался бы на старом месяце.
+  function shiftDialogDay(direction) {
+    if (!state.dialogDate) return false;
+    const iso = addDaysIso(state.dialogDate, direction);
+    if (!isValidISO(iso)) return false;
+    const before = getVisiblePeriod();
+    state.cursor = fromISO(iso);
+    const after = getVisiblePeriod();
+    // Сменился видимый период — обновляем всё под окном (заголовок, прогресс,
+    // подсветку). Внутри периода сетка та же, лишний пересбор не нужен.
+    if (before.start.getTime() !== after.start.getTime() || before.end.getTime() !== after.end.getTime()) {
+      renderAll(false);
+    }
+    openDay(iso);
+    return true;
+  }
+
   function summarizeTasks(entries) {
     const total = entries.length;
     const done = entries.filter((entry) => entry.done).length;
@@ -2359,6 +2385,20 @@ const TOAST_ACTION_MS = 6000;
     }
   }
 
+  // Экспорт файла на телефон. В WebView атрибут download у blob-ссылки не работает
+  // (Capacitor не ставит обработчик загрузок), поэтому на Android файл пишет
+  // нативный метод saveBackup — в общую папку «Загрузки», и он же сообщает путь.
+  function saveFileOnDevice(filename, content, type) {
+    const plugin = nativeWidgetPlugin();
+    if (!plugin || typeof plugin.saveBackup !== "function") {
+      downloadFile(filename, content, type);
+      return Promise.resolve({ ok: true, path: null });
+    }
+    return Promise.resolve(plugin.saveBackup({ filename, content }))
+      .then((result) => ({ ok: true, path: (result && result.path) || `Download/${filename}` }))
+      .catch((error) => ({ ok: false, message: (error && error.message) || "" }));
+  }
+
   function downloadFile(filename, content, type) {
     const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
@@ -2381,12 +2421,17 @@ const TOAST_ACTION_MS = 6000;
       series: state.series,
       settings: state.settings
     };
-    downloadFile(
-      `pixel-calendar-2027-backup-${toISO(new Date())}.json`,
-      JSON.stringify(payload, null, 2),
-      "application/json"
-    );
-    showToast("Резервная копия скачана");
+    const name = `pixel-calendar-2027-backup-${toISO(new Date())}.json`;
+    const text = JSON.stringify(payload, null, 2);
+    // На телефоне сохранение делает нативный метод — в общую папку «Загрузки».
+    // Тост показывает путь, иначе «копия скачана» звучит как обещание, которого не видно.
+    saveFileOnDevice(name, text, "application/json").then((result) => {
+      if (!result.ok) {
+        showToast("Не удалось сохранить копию. Попробуйте ещё раз.");
+        return;
+      }
+      showToast(result.path ? `Копия сохранена: ${result.path}` : "Резервная копия скачана");
+    });
   }
 
   function icsEscape(text) {
@@ -2493,12 +2538,14 @@ const TOAST_ACTION_MS = 6000;
   }
 
   function exportICS() {
-    downloadFile(
-      `pixel-calendar-2027-${toISO(new Date())}.ics`,
-      buildICS(),
-      "text/calendar;charset=utf-8"
-    );
-    showToast("Файл .ics готов для Google Календаря");
+    const name = `pixel-calendar-2027-${toISO(new Date())}.ics`;
+    saveFileOnDevice(name, buildICS(), "text/calendar;charset=utf-8").then((result) => {
+      if (!result.ok) {
+        showToast("Не удалось сохранить файл. Попробуйте ещё раз.");
+        return;
+      }
+      showToast(result.path ? `Календарь сохранён: ${result.path}` : "Файл .ics готов для Google Календаря");
+    });
   }
 
   function googleCalendarUrl(entry, iso) {
@@ -2984,6 +3031,145 @@ const TOAST_ACTION_MS = 6000;
     els.calendarView.addEventListener("pointercancel", () => {
       swipeStart = null;
     });
+
+    // Жесты в окне дня: свайп вбок листает дни, потягивание шапки вниз закрывает окно.
+    // Модель та же, что у свайпа по календарю: только палец, жест должен быть явно
+    // своим (порог по модулю и против второй оси), а клик сразу после жеста гасится
+    // (suppressDialogClickUntil), иначе тап «нажимал» дело вместо листания.
+    const DAY_SWIPE_MIN = 48;
+    // Шапка 73–74px: порог закрытия 64px — почти вся её высота, то есть осознанное
+    // движение, а не случайное касание или микросдвиг при клике.
+    const HEAD_PULL_CLOSE = 64;
+    const HEAD_PULL_MAX = 140;
+    const AXIS_LOCK_MIN = 8;
+    const GESTURE_BLOCK = "button, input, select, textarea, a, label, [data-action]";
+
+    const setDayGesture = (translate, opacity) => {
+      els.dialogCard.style.translate = translate;
+      els.dialogCard.style.opacity = opacity;
+    };
+
+    const resetDayGesture = (animate) => {
+      dayGesture = null;
+      els.dialogCard.classList.remove("is-gesture");
+      if (animate) {
+        els.dialogCard.classList.add("is-settling");
+        window.clearTimeout(dayGestureTimer);
+        dayGestureTimer = window.setTimeout(() => {
+          els.dialogCard.classList.remove("is-settling");
+        }, 240);
+      } else {
+        els.dialogCard.classList.remove("is-settling");
+        window.clearTimeout(dayGestureTimer);
+      }
+      setDayGesture("", "");
+    };
+
+    els.dialogCard.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse") return;
+      if (event.target.closest(GESTURE_BLOCK)) return;
+      const inHead = Boolean(event.target.closest(".dialog-head"));
+      // В списке дел вертикальная прокрутка важнее: свайп там не начинаем.
+      if (!inHead && event.target.closest("#taskList")) return;
+      dayGesture = {
+        id: event.pointerId,
+        mode: inHead ? "pull" : "swipe",
+        x: event.clientX,
+        y: event.clientY,
+        axis: null
+      };
+      // Захватываем указатель: без этого палец (перо) может уйти за карточку и
+      // отпуститься вне неё — pointerup придёт другому элементу, dayGesture не
+      // обнулится, и карточка застрянет сдвинутой и без анимации возврата.
+      // У касания захват неявный, но перо и стилус его не получают.
+      try {
+        els.dialogCard.setPointerCapture(event.pointerId);
+      } catch (error) {
+        // Старый WebView без захвата: сработает страховка lostpointercapture/window ниже.
+      }
+      els.dialogCard.classList.remove("is-settling");
+      els.dialogCard.classList.add("is-gesture");
+    });
+
+    // Страховка: если захват потерян (или его не было), жест не должен зависнуть.
+    // Срабатывает только пока жест реально не завершён — после своего pointerup
+    // dayGesture уже пуст, и повторный сброс не перезапускает анимацию возврата.
+    els.dialogCard.addEventListener("lostpointercapture", (event) => {
+      if (dayGesture && dayGesture.id === event.pointerId) resetDayGesture(true);
+    });
+    window.addEventListener("pointerup", (event) => {
+      if (dayGesture && dayGesture.id === event.pointerId) resetDayGesture(true);
+    });
+    window.addEventListener("pointercancel", (event) => {
+      if (dayGesture && dayGesture.id === event.pointerId) resetDayGesture(true);
+    });
+
+    els.dialogCard.addEventListener("pointermove", (event) => {
+      if (!dayGesture || dayGesture.id !== event.pointerId) return;
+      const dx = event.clientX - dayGesture.x;
+      const dy = event.clientY - dayGesture.y;
+      if (!dayGesture.axis) {
+        if (Math.abs(dx) < AXIS_LOCK_MIN && Math.abs(dy) < AXIS_LOCK_MIN) return;
+        const horizontal = Math.abs(dx) >= Math.abs(dy);
+        if (dayGesture.mode === "pull" ? horizontal : !horizontal) {
+          if (dayGesture.mode === "pull" && horizontal) {
+            // Начали за шапку, а ведём вбок: это листание дней, а не потягивание.
+            dayGesture.mode = "swipe";
+          } else {
+            // Ось не наша: отдаём жест браузеру (прокрутку не отбираем).
+            resetDayGesture(false);
+            return;
+          }
+        }
+        dayGesture.axis = horizontal ? "x" : "y";
+      }
+      if (dayGesture.mode === "pull") {
+        // Вверх шапку не тянем: карточка идёт только за пальцем вниз.
+        const shift = Math.max(0, Math.min(dy, HEAD_PULL_MAX));
+        setDayGesture(`0 ${shift}px`, String(Math.max(0.6, 1 - shift / 360)));
+      } else {
+        setDayGesture(`${Math.max(-HEAD_PULL_MAX, Math.min(dx, HEAD_PULL_MAX))}px 0`, "");
+      }
+    });
+
+    els.dialogCard.addEventListener("pointerup", (event) => {
+      if (!dayGesture || dayGesture.id !== event.pointerId) return;
+      const dx = event.clientX - dayGesture.x;
+      const dy = event.clientY - dayGesture.y;
+      const mode = dayGesture.mode;
+      const horizontal = dayGesture.axis === "x";
+      const vertical = dayGesture.axis === "y";
+
+      if (mode === "pull" && vertical
+        && dy >= HEAD_PULL_CLOSE && Math.abs(dy) >= Math.abs(dx) * 1.5) {
+        // Закрываем только при явном движении вниз: почти вся высота шапки (73–74px)
+        // и заметный перевес над горизонталью, чтобы диагональ окно не гасила.
+        dayGesture = null;
+        suppressDialogClickUntil = Date.now() + 350;
+        els.dialogCard.classList.add("is-settling");
+        setDayGesture(`0 ${Math.min(dy, HEAD_PULL_MAX)}px`, "0.35");
+        window.clearTimeout(dayGestureTimer);
+        // Карточка доезжает за пальцем ещё кадр-другой и только потом закрывается:
+        // без этого она «щёлкала» на место перед закрытием.
+        dayGestureTimer = window.setTimeout(closeDayDialog, 160);
+        return;
+      }
+
+      resetDayGesture(true);
+      if (mode === "pull" || !horizontal) return;
+      if (Math.abs(dx) < DAY_SWIPE_MIN || Math.abs(dx) < Math.abs(dy) * 1.6) return;
+      suppressDialogClickUntil = Date.now() + 350;
+      shiftDialogDay(dx < 0 ? 1 : -1);
+    });
+
+    els.dialogCard.addEventListener("pointercancel", () => resetDayGesture(true));
+    els.dialog.addEventListener("close", () => resetDayGesture(false));
+    // Пока подавляем клик, он не должен уходить ни в крестик, ни в список дел.
+    els.dialog.addEventListener("click", (event) => {
+      if (Date.now() >= suppressDialogClickUntil) return;
+      event.stopPropagation();
+      event.preventDefault();
+    }, true);
 
     els.calendarView.addEventListener("click", (event) => {
       if (Date.now() < suppressClickUntil) return;
@@ -3686,8 +3872,14 @@ const TOAST_ACTION_MS = 6000;
       showToast("Сохранять нечего");
       return;
     }
-    downloadFile(`pixel-calendar-2027-raw-${new Date().toISOString().slice(0, 10)}.json`, source, "application/json");
-    showToast("Сырая строка сохранена");
+    const name = `pixel-calendar-2027-raw-${new Date().toISOString().slice(0, 10)}.json`;
+    saveFileOnDevice(name, source, "application/json").then((result) => {
+      if (!result.ok) {
+        showToast("Не удалось сохранить копию. Попробуйте ещё раз.");
+        return;
+      }
+      showToast(result.path ? `Сырая строка сохранена: ${result.path}` : "Сырая строка сохранена");
+    });
   }
 
   function dropRecoveryCopies() {

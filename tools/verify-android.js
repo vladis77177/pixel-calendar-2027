@@ -24,6 +24,16 @@ check(manifest.includes("CalendarWidgetProvider"), "Widget receiver is not regis
 check(manifest.includes("RECEIVE_BOOT_COMPLETED"), "Boot permission is missing");
 check(manifest.includes("POST_NOTIFICATIONS"), "Notification permission is missing");
 check(manifest.includes("SCHEDULE_EXACT_ALARM"), "Exact alarm permission is missing");
+check(
+  /<uses-permission android:name="android\.permission\.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" \/>/.test(manifest),
+  "WRITE_EXTERNAL_STORAGE with maxSdkVersion=\"28\" is missing: Android 7–9 needs it to write the JSON backup into the public Downloads folder"
+);
+check(
+  !/<uses-permission android:name="android\.permission\.WRITE_EXTERNAL_STORAGE"[^>]*\/>/.test(
+    manifest.replace(/<uses-permission android:name="android\.permission\.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" \/>/g, "")
+  ),
+  "WRITE_EXTERNAL_STORAGE is requested without maxSdkVersion=\"28\": Android 10+ writes through MediaStore and must not ask for it"
+);
 check(manifest.includes("calendar_widget_info"), "Widget metadata is missing");
 check(
   /android:allowBackup="false"/.test(manifest),
@@ -125,6 +135,11 @@ check(
 );
 const bridge = read(`java/${PACKAGE.split(".").join("/")}/WidgetBridgePlugin.java`);
 check(bridge.includes("consumeToggles"), "WidgetBridgePlugin must expose consumeToggles");
+check(bridge.includes("saveBackup"), "WidgetBridgePlugin must expose saveBackup to write the JSON backup into Downloads");
+check(
+  bridge.includes("MediaStore.Downloads") && bridge.includes("DIRECTORY_DOWNLOADS"),
+  "saveBackup must write via MediaStore.Downloads into Environment.DIRECTORY_DOWNLOADS on Android 10+"
+);
 check(
   Boolean(CONFIG.android && CONFIG.android.backgroundColor),
   "capacitor.config.json must set android.backgroundColor — otherwise the WebView is white until the page paints (launch flash)"

@@ -2347,10 +2347,24 @@ html[data-profile="full"] .day-dialog::backdrop {
   /* Слой создаётся заранее: анимация открытия не заставляет перерисовывать
      карточку с тенью и тайловым фоном на каждом кадре. */
   will-change: transform;
+  /* Горизонталь у жестов окна дня забираем себе (свайп листает дни), вертикаль
+     остаётся браузеру — иначе сломается прокрутка списка дел и длинного окна. */
+  touch-action: pan-y;
 }
 
 .day-dialog[open] .dialog-card {
   animation: dialog-pop 0.22s steps(4, end) both;
+}
+
+/* Жесты окна дня: карточка едет за пальцем через translate (не transform — его
+   занимает анимация открытия). Во время жеста переход выключен, иначе карточка
+   догоняла бы палец с задержкой; на отпускании включается короткий возврат. */
+.dialog-card.is-gesture {
+  transition: none;
+}
+
+.dialog-card.is-settling {
+  transition: translate 0.18s ease-out, opacity 0.18s ease-out;
 }
 
 .dialog-head {
@@ -2359,6 +2373,9 @@ html[data-profile="full"] .day-dialog::backdrop {
   justify-content: space-between;
   gap: 14px;
   padding: 15px 17px 14px;
+  /* Потягивание шапки вниз закрывает окно, поэтому вертикальное движение здесь
+     не отдаём браузеру: иначе жест превращался бы в прокрутку страницы. */
+  touch-action: none;
   background-color: var(--green);
   background-image:
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 8px, transparent 8px 16px),
@@ -2446,6 +2463,11 @@ html[data-profile="full"] .day-dialog::backdrop {
   overscroll-behavior: contain;
   scrollbar-width: thin;
   scrollbar-color: #b79a63 transparent;
+  /* Скролл-контейнер обрывает цепочку touch-action: без этого правила браузер
+     забирает горизонтальный жест себе и гасит его pointercancel — свайп по телу
+     окна не листал бы день (проверено на настоящих touch-событиях). pan-y
+     оставляет вертикальную прокрутку браузеру, горизонталь — приложению. */
+  touch-action: pan-y;
 }
 
 .dialog-body::-webkit-scrollbar {
@@ -2515,9 +2537,10 @@ html[data-profile="full"] .day-dialog::backdrop {
 
 /* «Перенести незавершённое» — второе по важности действие окна дня. Широкая,
    но кремовая (как .pixel-btn), чтобы не спорить с зелёной «Добавить»;
-   отступы повторяют ритм диалога: 10px от списка, 2px до блока ниже (там уже
-   13px отступа у .add-form). При hidden правило не работает — блок исчезает,
-   layout не прыгает. */
+   отступы повторяют ритм диалога: 10px от списка, а 2px до блока ниже
+   схлопываются с 13px margin-top блока быстрых дел или формы — до них всё
+   равно 13px, как у остальных стыков. При hidden правило не работает —
+   блок исчезает, layout не прыгает. */
 .move-tomorrow-btn {
   display: flex;
   width: 100%;
@@ -2927,8 +2950,11 @@ html[data-profile="full"] .day-dialog::backdrop {
 }
 
 /* Длинная подпись сжимается и переносится, а не выдавливает кнопку за тост. */
+/* Текст тоста может содержать путь («Download/pixel-calendar-2027-backup-2026-11-18.json»):
+   переносим по любому символу, иначе длинная строка растягивает плашку. */
 .toast > span:not(.toast-cube) {
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* Кнопка выше текста тоста на 8px; на узком экране тост не раздувается. */
@@ -3984,12 +4010,17 @@ html[data-daytime="night"] .update-badge-warn {
   outline-offset: 2px;
 }
 
-/* Быстрые дела над формой добавления. */
+/* Быстрые дела над формой добавления. Ритм тот же, что у соседних блоков окна:
+   13px от списка дел и 13px до формы — ровно столько же, сколько у стыка
+   «список → форма» (.add-form margin-top). Собственного padding нет: с ним стыки
+   разъезжались (10+13=23px). После видимой кнопки «Перенести незавершённое»
+   выходит 2+13=15px — тот же ритм, что кнопка задаёт форме (её margin-bottom 2px). */
 .template-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 0 0 10px;
+  margin: 13px 0 0;
+  padding: 0;
 }
 
 .template-chips[hidden] {

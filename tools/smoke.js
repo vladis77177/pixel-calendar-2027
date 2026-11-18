@@ -682,6 +682,76 @@ function isoToday() {
       new Date(parsedTask.remindAt).getTime() === new Date(`${tomorrow}T15:00:00`).getTime()
     ), JSON.stringify(parsedTask));
 
+    // 18. Жесты в окне дня: свайп листает дни, потягивание шапки закрывает окно.
+    // События синтетические и с pointerType: "touch" — мышь жест не запускает.
+    // Пороги детерминированные: 20px мало, 100px хватает, 30px по шапке мало,
+    // 110px закрывает. Никаких «подождём и посмотрим».
+    const gesture = (selector, dx, dy) => `(() => {
+      const node = document.querySelector(${JSON.stringify(selector)});
+      if (!node) return null;
+      const r = node.getBoundingClientRect();
+      const x0 = Math.round(r.left + r.width / 2);
+      const y0 = Math.round(r.top + Math.min(r.height / 2, 24));
+      const fire = (type, x, y) => node.dispatchEvent(new PointerEvent(type, {
+        bubbles: true, cancelable: true, pointerId: 42, pointerType: "touch",
+        isPrimary: true, clientX: x, clientY: y, buttons: type === "pointerup" ? 0 : 1
+      }));
+      fire("pointerdown", x0, y0);
+      for (let step = 1; step <= 6; step += 1) {
+        fire("pointermove", x0 + (${dx} * step) / 6, y0 + (${dy} * step) / 6);
+      }
+      fire("pointerup", x0 + ${dx}, y0 + ${dy});
+      return document.getElementById("dialogTitle").textContent.trim();
+    })()`;
+    const openTitle = `document.getElementById("dialogTitle").textContent.trim()`;
+    const openIso = `(document.querySelector(".day-cell.is-selected[data-date]") || {}).dataset?.date || null`;
+    const dialogOpen = `document.getElementById("dayDialog").open === true`;
+    // После жеста приложение глушит клик на 350 мс (защита от фантомного тапа).
+    // Ждём это окно явно: иначе клик по клетке гасится и окно не открывается —
+    // именно на этом прогон спотыкался то в одном месте, то в другом.
+    const afterGesture = () => sleep(420);
+
+    await cdp.eval(`(() => { const d = document.querySelector("#dayDialog"); if (d.open) d.close(); return true; })()`);
+    await afterGesture();
+    await cdp.eval(`document.querySelector('.day-cell[data-date="${today}"]').click(); true`);
+    await cdp.waitFor(dialogOpen, "окно дня открылось для жестов");
+
+    const gestureStart = await cdp.eval(openTitle);
+    const gestureStartIso = await cdp.eval(openIso);
+    const shortSwipe = await cdp.eval(gesture(".day-summary", -20, 0));
+    check("жест: короткий свайп 20px день не меняет", shortSwipe === gestureStart && await cdp.eval(openIso) === gestureStartIso, `${gestureStart} → ${shortSwipe}`);
+
+    const diagonal = await cdp.eval(gesture(".day-summary", 60, 100));
+    check("жест: диагональ 60x100 день не меняет", diagonal === gestureStart && await cdp.eval(openIso) === gestureStartIso, `${gestureStart} → ${diagonal}`);
+
+    await cdp.eval(gesture(".day-summary", -100, 0));
+    const swipeLeftIso = await cdp.eval(openIso);
+    check("жест: свайп влево 100px открывает следующий день", swipeLeftIso === tomorrow, `${gestureStartIso} → ${swipeLeftIso}`);
+    check("жест: календарь под окном отметил новый день", await cdp.eval(
+      `document.querySelector('.day-cell.is-selected[data-date="${tomorrow}"]') !== null`
+    ));
+
+    await cdp.eval(gesture(".day-summary", 100, 0));
+    const swipeRightIso = await cdp.eval(openIso);
+    check("жест: свайп вправо 100px возвращает предыдущий день", swipeRightIso === gestureStartIso, `${swipeLeftIso} → ${swipeRightIso}`);
+
+    const smallPull = await cdp.eval(gesture(".dialog-head", 0, 30));
+    check("жест: потягивание шапки на 30px окно не закрывает", Boolean(smallPull) && await cdp.eval(dialogOpen));
+
+    await cdp.eval(gesture(".dialog-head", 0, 110));
+    await cdp.waitFor(`document.getElementById("dayDialog").open === false`, "окно закрылось потягиванием");
+    check("жест: потягивание шапки на 110px закрывает окно", true);
+
+    await cdp.eval(`(() => { const d = document.querySelector("#dayDialog"); if (d.open) d.close(); return true; })()`);
+    await sleep(400);
+    await cdp.eval(`document.querySelector('.day-cell[data-date="${today}"]').click(); true`);
+    await cdp.waitFor(dialogOpen, "окно дня для проверки крестика");
+    await cdp.eval(gesture(".dialog-head", 0, 0));
+    check("жест: тап по шапке окно не закрывает", await cdp.eval(dialogOpen));
+    await cdp.eval(`document.getElementById("dialogCloseBtn").click(); true`);
+    await cdp.waitFor(`document.getElementById("dayDialog").open === false`, "крестик закрыл окно");
+    check("жест: крестик по-прежнему закрывает окно", true);
+
     check("ошибок в консоли нет", consoleErrors.length === 0, consoleErrors.join(" | "));
     check("падений JS нет", exceptions.length === 0, exceptions.join(" | "));
   } catch (error) {
