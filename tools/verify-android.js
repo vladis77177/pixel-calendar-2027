@@ -140,6 +140,35 @@ check(
   bridge.includes("MediaStore.Downloads") && bridge.includes("DIRECTORY_DOWNLOADS"),
   "saveBackup must write via MediaStore.Downloads into Environment.DIRECTORY_DOWNLOADS on Android 10+"
 );
+
+// Кнопка «назад» перехватывается в JS (событие backButton плагина @capacitor/app),
+// иначе плагин вызывает webView.goBack() и закрывает Activity — приложение сворачивается.
+const androidRoot = path.join(ROOT, "android");
+const capAppSettings = (() => {
+  const file = path.join(androidRoot, "capacitor.settings.gradle");
+  return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+})();
+check(
+  capAppSettings.includes("capacitor-app"),
+  "Android project must include the @capacitor/app plugin (needed for the back button)"
+);
+const capAppBuildGradle = (() => {
+  const file = path.join(androidRoot, "app", "capacitor.build.gradle");
+  return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+})();
+check(
+  capAppBuildGradle.includes("':capacitor-app'"),
+  "app/capacitor.build.gradle must depend on ':capacitor-app'"
+);
+const appSource = fs.readFileSync(path.join(ROOT, "app.js"), "utf8");
+check(
+  /addListener\(\s*"backButton"/.test(appSource),
+  "app.js must subscribe to the backButton event, otherwise Android closes the Activity on back"
+);
+check(
+  appSource.includes("exitApp"),
+  "app.js must exit the app on the second back press at the home screen"
+);
 check(
   Boolean(CONFIG.android && CONFIG.android.backgroundColor),
   "capacitor.config.json must set android.backgroundColor — otherwise the WebView is white until the page paints (launch flash)"

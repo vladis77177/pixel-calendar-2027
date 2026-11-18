@@ -4163,6 +4163,46 @@ const TOAST_ACTION_MS = 6000;
     });
   }
 
+  // Системная кнопка «назад» в APK: по одному слою за нажатие. Сначала верхний
+  // открытый слой (окно дня, поиск, настройки), затем возврат к сегодняшнему дню,
+  // если пользователь ушёл в другой период, и только потом — выход из приложения
+  // по второму нажатию. Подписка на событие `backButton` обязательна: без неё
+  // плагин @capacitor/app сам вызывает webView.goBack() / закрывает Activity —
+  // именно это и «сворачивало» приложение вместо возврата на главный экран.
+  function setupAndroidBack() {
+    const capacitor = window.Capacitor;
+    const plugin = capacitor && capacitor.Plugins ? capacitor.Plugins.App : null;
+    if (!isNativeApp() || !plugin || typeof plugin.addListener !== "function") return;
+    let lastBackAt = 0;
+    plugin.addListener("backButton", () => {
+      if (els.dialog.open) {
+        closeDayDialog();
+        return;
+      }
+      if (els.searchDialog.open) {
+        hideDialog(els.searchDialog);
+        return;
+      }
+      if (els.settingsDialog.open) {
+        hideDialog(els.settingsDialog);
+        return;
+      }
+      const today = startOfDay(new Date());
+      if (!isSameDay(state.cursor, today) || state.selectedDate !== toISO(today)) {
+        goToToday();
+        return;
+      }
+      const now = Date.now();
+      if (now - lastBackAt < 2000) {
+        if (typeof plugin.exitApp === "function") plugin.exitApp();
+        return;
+      }
+      // Первое нажатие на главном — предупреждаем, второе (в пределах двух секунд) выходит.
+      lastBackAt = now;
+      showToast("Нажмите «назад» ещё раз, чтобы выйти");
+    });
+  }
+
   function init() {
     applyProfile();
     applyDaytime();
@@ -4177,6 +4217,7 @@ const TOAST_ACTION_MS = 6000;
     registerServiceWorker();
     setupAppUpdateCheck();
     setupWidgetToggles();
+    setupAndroidBack();
     renderAll(true);
     setupSnowman();
     document.fonts.ready.then(scheduleFitMonth);
