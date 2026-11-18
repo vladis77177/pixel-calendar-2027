@@ -401,12 +401,13 @@ test("защита доступа к серверу синхронизации",
 test("по умолчанию данные сервера живут вне папки проекта", async (t) => {
   const appData = fs.mkdtempSync(path.join(os.tmpdir(), "pixel-appdata-"));
   const port = await freePort();
+  // SYNC_TOKEN не задаём намеренно: тогда сервер сам создаёт token.txt, и его
+  // появление в новой папке — доказательство, что писать он стал туда.
   const child = spawn(process.execPath, [path.join(ROOT, "sync-server", "server.js")], {
     env: {
       ...process.env,
       PORT: String(port),
       HOST: "127.0.0.1",
-      SYNC_TOKEN: TOKEN,
       LOCALAPPDATA: appData,
       XDG_DATA_HOME: appData
     },
@@ -424,9 +425,10 @@ test("по умолчанию данные сервера живут вне па
     `код подключения должен лежать в ${expected}, а не в папке проекта`
   );
 
+  const saved = fs.readFileSync(path.join(expected, "token.txt"), "utf8").trim();
   const response = await fetch(`http://127.0.0.1:${port}/api/state`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "X-Sync-Token": TOKEN },
+    headers: { "Content-Type": "application/json", "X-Sync-Token": saved },
     body: JSON.stringify(body({ "2026-11-10": [makeTask({ text: "Вне проекта" })] }))
   });
   assert.equal(response.status, 200);
