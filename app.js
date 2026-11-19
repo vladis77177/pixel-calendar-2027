@@ -1444,7 +1444,9 @@ const TOAST_ACTION_MS = 6000;
     renderQuickAddDate();
   }
 
-  function openDay(iso) {
+  // keepDraft — для свайпа внутри открытого окна: день меняется, а начатый текст
+  // и время остаются. Иначе листание стирало уже набранное дело.
+  function openDay(iso, { keepDraft = false } = {}) {
     const date = fromISO(iso);
     if (Number.isNaN(date.getTime())) return;
     selectDate(iso);
@@ -1454,11 +1456,13 @@ const TOAST_ACTION_MS = 6000;
     lastDayISO = iso;
     populateDialog();
     els.formError.textContent = "";
-    els.taskInput.value = "";
-    els.taskRepeat.value = "none";
-    els.taskRepeatEnd.value = "";
-    els.taskTime.value = "";
-    els.taskLead.value = "";
+    if (!keepDraft) {
+      els.taskInput.value = "";
+      els.taskRepeat.value = "none";
+      els.taskRepeatEnd.value = "";
+      els.taskTime.value = "";
+      els.taskLead.value = "";
+    }
     updateRepeatFields();
     renderTemplateChips();
     showDialog(els.dialog);
@@ -1483,7 +1487,7 @@ const TOAST_ACTION_MS = 6000;
     if (before.start.getTime() !== after.start.getTime() || before.end.getTime() !== after.end.getTime()) {
       renderAll(false);
     }
-    openDay(iso);
+    openDay(iso, { keepDraft: els.dialog.open });
     return true;
   }
 
@@ -1733,10 +1737,15 @@ const TOAST_ACTION_MS = 6000;
     if (!hasTime) els.taskLead.value = "";
     if (active) {
       els.taskRepeatEnd.min = state.dialogDate || "";
-      els.repeatHint.textContent = "Серия появится во всех подходящих днях, а время включит напоминание в каждый такой день. Отметки и удаления хранятся отдельно для каждого дня.";
+      els.repeatHint.textContent = "Повтор делает дело серией: оно видно во всех подходящих днях, а время включит напоминание в каждый такой день. Отметки и удаления хранятся отдельно для каждого дня.";
     } else {
       els.taskRepeatEnd.value = "";
-      els.repeatHint.textContent = "Время включает напоминание в приложении. Повторяющиеся дела видны во всех подходящих днях.";
+      els.repeatHint.textContent = "Время включает напоминание в приложении, повтор — превращает дело в серию.";
+    }
+    // Поле «Заранее» скрыто, пока нет времени, и это главная причина, по которой
+    // «напомнить заранее» не находили. Подсказка говорит, что поле появится.
+    if (!hasTime) {
+      els.repeatHint.textContent = "Выберите время — включится напоминание и появится поле «Заранее» (за 10 минут, за час, за день).";
     }
   }
 
@@ -3232,6 +3241,11 @@ const TOAST_ACTION_MS = 6000;
     bindDialogBackdrop(els.dialog, closeDayDialog);
 
     els.dialog.addEventListener("close", () => {
+      // Событие close приходит задачей уже после close(), а не сразу. Если окно
+      // успели открыть заново в том же задании (свайп на соседний день, повторный
+      // клик по клетке), обработчик сработает поверх нового openDay и обнулит
+      // день открытого окна — форма добавления потом молча не пишет.
+      if (els.dialog.open) return;
       state.dialogDate = null;
       state.editingKey = null;
       state.deleteConfirmKey = null;

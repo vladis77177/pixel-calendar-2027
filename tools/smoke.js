@@ -752,6 +752,69 @@ function isoToday() {
     await cdp.waitFor(`document.getElementById("dayDialog").open === false`, "крестик закрыл окно");
     check("жест: крестик по-прежнему закрывает окно", true);
 
+    // Свайп внутри открытого окна не должен стирать начатое дело: день меняется,
+    // набранный текст остаётся.
+    await cdp.eval(`document.querySelector('.day-cell[data-date="${today}"]').click(); true`);
+    await cdp.waitFor(dialogOpen, "окно дня открылось для проверки черновика");
+    const draftFrom = await cdp.eval(openIso);
+    await cdp.eval(`document.getElementById("taskInput").value = "Черновик до свайпа"; true`);
+    await cdp.eval(gesture(".day-summary", -100, 0));
+    const draft = await cdp.eval(`(() => ({
+      text: document.getElementById("taskInput").value,
+      iso: (document.querySelector(".day-cell.is-selected[data-date]") || {}).dataset?.date || null
+    }))()`);
+    check("жест: свайп дня сохраняет начатый текст", draft.text === "Черновик до свайпа"
+      && draft.iso && draft.iso !== draftFrom, `${draftFrom} → ${JSON.stringify(draft)}`);
+
+    // Подсказка: поле «Заранее» появляется только после времени — именно этого
+    // не хватало, чтобы найти «напомнить заранее».
+    const leadHint = await cdp.eval(`(() => {
+      const time = document.getElementById("taskTime");
+      const hintBefore = document.getElementById("repeatHint").textContent;
+      const hiddenBefore = document.getElementById("taskLeadWrap").hidden;
+      time.value = "09:00";
+      time.dispatchEvent(new Event("input", { bubbles: true }));
+      const result = {
+        hintBefore,
+        hiddenBefore,
+        hiddenAfter: document.getElementById("taskLeadWrap").hidden
+      };
+      time.value = "";
+      time.dispatchEvent(new Event("input", { bubbles: true }));
+      return result;
+    })()`);
+    check("подсказка: до времени говорит про поле «Заранее»", leadHint.hiddenBefore
+      && /Заранее/.test(leadHint.hintBefore), JSON.stringify(leadHint));
+    check("подсказка: после времени поле «Заранее» появляется", leadHint.hiddenAfter === false, JSON.stringify(leadHint));
+
+    // Гонка close: событие close приходит задачей уже после openDay этого же
+    // задания, поэтому обработчик раньше обнулял день открытого окна и форма
+    // молча не писала. Закрываем и открываем окно в одном задании и проверяем,
+    // что дело реально легло в выбранный день.
+    const raceOpened = await cdp.eval(`(() => {
+      const d = document.getElementById("dayDialog");
+      document.getElementById("taskInput").value = "";
+      if (d.open) d.close();
+      document.querySelector('.day-cell[data-date="${tomorrow}"]').click();
+      return d.open;
+    })()`);
+    await sleep(120);
+    const raceSaved = await cdp.eval(`(() => {
+      const input = document.getElementById("taskInput");
+      input.value = "Проверка гонки close";
+      document.getElementById("taskForm").requestSubmit();
+      const store = JSON.parse(localStorage.getItem("pixel-calendar-2027-v1") || "{}");
+      const tasks = (store.tasks || {})["${tomorrow}"] || [];
+      return tasks.some((task) => task.text === "Проверка гонки close");
+    })()`);
+    check("окно: закрытие и повторное открытие в одном задании сохраняет день", raceOpened && raceSaved, `открыто=${raceOpened}, записано=${raceSaved}`);
+    await cdp.eval(`(() => {
+      document.getElementById("taskInput").value = "";
+      document.getElementById("dialogCloseBtn").click();
+      return true;
+    })()`);
+    await sleep(200);
+
     check("ошибок в консоли нет", consoleErrors.length === 0, consoleErrors.join(" | "));
     check("падений JS нет", exceptions.length === 0, exceptions.join(" | "));
   } catch (error) {
