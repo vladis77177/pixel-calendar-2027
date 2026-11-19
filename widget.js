@@ -119,7 +119,7 @@
     if (Array.isArray(parsed.series)) {
       parsed.series.forEach((raw) => {
         if (!raw || typeof raw.text !== "string" || !raw.text.trim()) return;
-        if (!["daily", "weekdays", "weekly", "monthly", "yearly"].includes(raw.freq) || !isValidISO(raw.start)) return;
+        if (!["daily", "weekdays", "weekly", "monthly", "yearly", "custom-days", "custom-weekdays"].includes(raw.freq) || !isValidISO(raw.start)) return;
         let end = isValidISO(raw.end) ? raw.end : null;
         if (end && end < raw.start) end = null;
         const exceptions = {};
@@ -259,6 +259,8 @@
     if (series.freq === "daily") return "каждый день";
     if (series.freq === "weekdays") return "по будням";
     if (series.freq === "weekly") return "каждую неделю";
+    if (series.freq === "custom-days") return "каждые N дней";
+    if (series.freq === "custom-weekdays") return "по дням недели";
     return "каждый месяц";
   }
 

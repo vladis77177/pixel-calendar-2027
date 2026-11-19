@@ -63,6 +63,24 @@
     return LEAD_MINUTES.includes(number) ? number : null;
   }
 
+  // Аддитивные поля новых частот: «каждые N дней» и набор дней недели.
+  // Пустое поле — null/[], а не повод выбросить серию: старая схема живёт дальше.
+  function normalizeInterval(value) {
+    const number = Math.floor(Number(value));
+    return number >= 1 && number <= 99 ? number : null;
+  }
+
+  function normalizeWeekdays(value) {
+    if (!Array.isArray(value)) return [];
+    const seen = [];
+    value.forEach((item) => {
+      const day = Math.floor(Number(item));
+      if (!Number.isFinite(day) || day < 0 || day > 6) return;
+      if (seen.indexOf(day) === -1) seen.push(day);
+    });
+    return seen.sort((a, b) => a - b);
+  }
+
   function normalizeDigestTime(value) {
     const text = String(value || "");
     return TIME_PATTERN.test(text) ? text : DEFAULT_SETTINGS.digestTime;
@@ -138,6 +156,8 @@
       end: typeof raw.end === "string" ? raw.end : null,
       time: normalizeTime(raw.time),
       leadMinutes: normalizeLead(raw.leadMinutes),
+      interval: normalizeInterval(raw.interval),
+      days: normalizeWeekdays(raw.days),
       createdAt,
       updatedAt,
       deletedAt: timeMs(raw.deletedAt) || null,

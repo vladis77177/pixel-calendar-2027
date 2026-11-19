@@ -79,6 +79,17 @@
     if (series.freq === "yearly") {
       return date.getMonth() === start.getMonth() && date.getDate() === start.getDate();
     }
+    // Аддитивные частоты схемы v4: «каждые N дней» и свой набор дней недели.
+    // interval/days приходят нормализованными (sync.js, loadStore); здесь только чтение,
+    // но защиты от мусора остаются — серия с битым полем не должна «исчезать» молча.
+    if (series.freq === "custom-days") {
+      const step = Math.max(1, Math.floor(Number(series.interval) || 1));
+      return diff % step === 0;
+    }
+    if (series.freq === "custom-weekdays") {
+      const days = Array.isArray(series.days) ? series.days : [];
+      return days.indexOf(date.getDay()) !== -1;
+    }
     return false;
   }
 

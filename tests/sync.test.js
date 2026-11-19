@@ -109,6 +109,48 @@ test("миграция сохраняет time/remindAt и отбрасывае�
   assert.equal(migrated.tasks["2026-11-10"][1].remindAt, null);
 });
 
+test("новые частоты: interval и days нормализуются, мусор отбрасывается", () => {
+  const migrated = migrateState({
+    series: [
+      {
+        id: "s-days", text: "Каждые 3 дня", freq: "custom-days", start: "2026-11-16",
+        interval: 3, days: [5, 1, 1, 9, "x"], updatedAt: 300
+      },
+      {
+        id: "s-week", text: "Пн-ср-пт", freq: "custom-weekdays", start: "2026-11-16",
+        days: [3, 1, 5, 3], interval: "abc", updatedAt: 300
+      },
+      {
+        id: "s-bad", text: "Старая серия", freq: "daily", start: "2026-11-16",
+        interval: 500, days: "пн", updatedAt: 300
+      }
+    ]
+  });
+  const byId = {};
+  migrated.series.forEach((item) => { byId[item.id] = item; });
+
+  assert.equal(byId["s-days"].interval, 3);
+  assert.deepEqual(byId["s-days"].days, [1, 5], "дубли и не-дни отброшены, порядок по возрастанию");
+  assert.deepEqual(byId["s-week"].days, [1, 3, 5]);
+  assert.equal(byId["s-week"].interval, null);
+  assert.equal(byId["s-bad"].interval, null, "500 вне 1..99");
+  assert.deepEqual(byId["s-bad"].days, [], "строка вместо массива");
+});
+
+test("новые частоты переживают слияние и синхронизацию", () => {
+  const local = state({}, [{
+    id: "s1", text: "Пн-ср-пт", freq: "custom-weekdays", start: "2026-11-16",
+    days: [1, 3, 5], interval: null, exceptions: {}, updatedAt: 200
+  }]);
+  const remote = state({}, [{
+    id: "s1", text: "Каждые 2 дня", freq: "custom-days", start: "2026-11-16",
+    days: [], interval: 2, exceptions: {}, updatedAt: 300
+  }]);
+  const merged = mergeStates(local, remote);
+  assert.equal(merged.series[0].interval, 2);
+  assert.deepEqual(merged.series[0].days, []);
+});
+
 test("LWW: побеждает более поздняя правка задачи", () => {
   const local = state({ "2026-11-10": [task({ text: "Старое", updatedAt: 100 })] });
   const remote = state({ "2026-11-10": [task({ text: "Новое", updatedAt: 200 })] });

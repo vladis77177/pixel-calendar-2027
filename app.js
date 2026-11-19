@@ -40,7 +40,7 @@
     digestTime: DIGEST_TIME_DEFAULT,
     templates: []
   };
-  const REPEATS = ["none", "daily", "weekdays", "weekly", "monthly", "yearly"];
+  const REPEATS = ["none", "daily", "weekdays", "weekly", "monthly", "yearly", "custom-days", "custom-weekdays"];
   // Быстрые дела: сколько строк храним и какой длины.
   const MAX_TEMPLATES = 12;
   const TEMPLATE_MAX_LENGTH = 60;
@@ -131,6 +131,10 @@
     taskInput: document.getElementById("taskInput"),
     taskRepeat: document.getElementById("taskRepeat"),
     taskRepeatEnd: document.getElementById("taskRepeatEnd"),
+    taskInterval: document.getElementById("taskInterval"),
+    taskIntervalWrap: document.getElementById("taskIntervalWrap"),
+    taskWeekdays: document.getElementById("taskWeekdays"),
+    weekdayParams: Array.from(document.querySelectorAll("#taskWeekdays [data-weekday]")),
     taskTime: document.getElementById("taskTime"),
     taskTimeWrap: document.getElementById("taskTimeWrap"),
     taskLead: document.getElementById("taskLead"),
@@ -278,6 +282,29 @@ const TOAST_ACTION_MS = 6000;
   function normalizeLeadValue(value) {
     const number = Number(value);
     return LEAD_OPTIONS.includes(number) ? number : null;
+  }
+
+  // Аддитивные поля новых частот: «каждые N дней» (interval) и набор дней (days).
+  // Те же границы, что в sync.js: сервер и приложение не должны расходиться.
+  function normalizeIntervalValue(value) {
+    const number = Math.floor(Number(value));
+    return number >= 1 && number <= 99 ? number : null;
+  }
+
+  function normalizeWeekdaysValue(list) {
+    if (!Array.isArray(list)) return [];
+    const days = [];
+    list.forEach((item) => {
+      const day = Math.floor(Number(item));
+      if (!Number.isFinite(day) || day < 0 || day > 6) return;
+      if (days.indexOf(day) === -1) days.push(day);
+    });
+    return days.sort((a, b) => a - b);
+  }
+
+  function weekdayCodes(days) {
+    const codes = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+    return normalizeWeekdaysValue(days).map((day) => codes[day]);
   }
 
   // Абсолютная метка напоминания: дата задачи + время. Нужна для сортировки
@@ -463,6 +490,8 @@ const TOAST_ACTION_MS = 6000;
           end,
           time: normalizeTimeValue(raw.time),
           leadMinutes: normalizeLeadValue(raw.leadMinutes),
+          interval: normalizeIntervalValue(raw.interval),
+          days: normalizeWeekdaysValue(raw.days),
           createdAt,
           updatedAt,
           deletedAt: Number(raw.deletedAt) || null,
@@ -801,6 +830,13 @@ const TOAST_ACTION_MS = 6000;
       label = `каждый ${weekday}`;
     } else if (series.freq === "monthly") {
       label = `${start.getDate()}-го числа каждого месяца`;
+    } else if (series.freq === "custom-days") {
+      const step = Math.max(1, Math.floor(Number(series.interval) || 1));
+      label = step === 1 ? "каждый день" : `каждые ${step} ${plural(step, ["день", "дня", "дней"])}`;
+    } else if (series.freq === "custom-weekdays") {
+      const names = normalizeWeekdaysValue(series.days)
+        .map((day) => WEEKDAYS_MONDAY_FIRST[(day + 6) % 7]);
+      label = names.length ? `по ${names.join(", ")}` : "по выбранным дням";
     } else {
       label = `${start.getDate()} ${MONTHS_GENITIVE[start.getMonth()]} — каждый год`;
     }
@@ -1458,8 +1494,7 @@ const TOAST_ACTION_MS = 6000;
     els.formError.textContent = "";
     if (!keepDraft) {
       els.taskInput.value = "";
-      els.taskRepeat.value = "none";
-      els.taskRepeatEnd.value = "";
+      resetRepeatFields();
       els.taskTime.value = "";
       els.taskLead.value = "";
     }
@@ -1729,11 +1764,41 @@ const TOAST_ACTION_MS = 6000;
     renderCalendar(false);
   }
 
+  // Пример владельца: «пн-ср-пт». Стартовый набор, дальше человек отмечает сам.
+  const DEFAULT_WEEKDAYS = [1, 3, 5];
+
+  function readWeekdaySelection() {
+    return normalizeWeekdaysValue(
+      els.weekdayParams
+        .filter((button) => button.getAttribute("aria-pressed") === "true")
+        .map((button) => Number(button.dataset.weekday))
+    );
+  }
+
+  function setWeekdaySelection(list) {
+    const days = normalizeWeekdaysValue(list);
+    els.weekdayParams.forEach((button) => {
+      const on = days.indexOf(Number(button.dataset.weekday)) !== -1;
+      button.setAttribute("aria-pressed", on ? "true" : "false");
+      button.classList.toggle("is-on", on);
+    });
+  }
+
+  function resetRepeatFields() {
+    els.taskRepeat.value = "none";
+    els.taskRepeatEnd.value = "";
+    els.taskInterval.value = "2";
+    setWeekdaySelection(DEFAULT_WEEKDAYS);
+  }
+
   function updateRepeatFields() {
-    const active = els.taskRepeat.value !== "none";
+    const repeat = REPEATS.includes(els.taskRepeat.value) ? els.taskRepeat.value : "none";
+    const active = repeat !== "none";
     const hasTime = Boolean(normalizeTimeValue(els.taskTime.value));
     els.repeatEndWrap.hidden = !active;
     els.taskLeadWrap.hidden = !hasTime;
+    els.taskIntervalWrap.hidden = repeat !== "custom-days";
+    els.taskWeekdays.hidden = repeat !== "custom-weekdays";
     if (!hasTime) els.taskLead.value = "";
     if (active) {
       els.taskRepeatEnd.min = state.dialogDate || "";
@@ -1741,6 +1806,22 @@ const TOAST_ACTION_MS = 6000;
     } else {
       els.taskRepeatEnd.value = "";
       els.repeatHint.textContent = "Время включает напоминание в приложении, повтор — превращает дело в серию.";
+    }
+    if (repeat === "custom-days") {
+      const step = normalizeIntervalValue(els.taskInterval.value) || 2;
+      els.repeatHint.textContent = `Серия повторится через ${step} ${plural(step, ["день", "дня", "дней"])}, считая от дня начала.`;
+    } else if (repeat === "custom-weekdays") {
+      const days = readWeekdaySelection();
+      els.repeatHint.textContent = days.length
+        ? `Серия появится по ${days.map((day) => WEEKDAYS_MONDAY_FIRST[(day + 6) % 7]).join(", ")}.`
+        : "Отметь хотя бы один день недели — иначе серии не будет.";
+    }
+    // Поле «Заранее» скрыто, пока нет времени, и это главная причина, по которой
+    // «напомнить заранее» не находили. Подсказка говорит, что поле появится.
+    if (!hasTime && repeat !== "custom-days" && repeat !== "custom-weekdays") {
+      els.repeatHint.textContent = "Выберите время — включится напоминание и появится поле «Заранее» (за 10 минут, за час, за день).";
+    } else if (!hasTime) {
+      els.repeatHint.textContent += " Время включит напоминание и поле «Заранее».";
     }
     // Поле «Заранее» скрыто, пока нет времени, и это главная причина, по которой
     // «напомнить заранее» не находили. Подсказка говорит, что поле появится.
@@ -1761,6 +1842,19 @@ const TOAST_ACTION_MS = 6000;
     const repeat = REPEATS.includes(els.taskRepeat.value) ? els.taskRepeat.value : "none";
     const time = normalizeTimeValue(els.taskTime.value);
     const leadMinutes = time ? normalizeLeadValue(els.taskLead.value) : null;
+    // Аддитивные частоты схемы v4: «каждые N дней» и свой набор дней недели.
+    const interval = repeat === "custom-days" ? normalizeIntervalValue(els.taskInterval.value) : null;
+    const days = repeat === "custom-weekdays" ? readWeekdaySelection() : [];
+    if (repeat === "custom-days" && !interval) {
+      els.formError.textContent = "Напиши, через сколько дней повторять: от 2 до 99.";
+      els.taskInterval.focus();
+      return;
+    }
+    if (repeat === "custom-weekdays" && !days.length) {
+      els.formError.textContent = "Отметь хотя бы один день недели.";
+      els.taskWeekdays.focus();
+      return;
+    }
     if (repeat !== "none") {
       const end = els.taskRepeatEnd.value;
       if (end && (!isValidISO(end) || end < state.dialogDate)) {
@@ -1776,6 +1870,8 @@ const TOAST_ACTION_MS = 6000;
         end: end || null,
         time,
         leadMinutes,
+        interval,
+        days,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         deletedAt: null,
@@ -1801,8 +1897,7 @@ const TOAST_ACTION_MS = 6000;
 
     saveStore();
     els.taskInput.value = "";
-    els.taskRepeat.value = "none";
-    els.taskRepeatEnd.value = "";
+    resetRepeatFields();
     els.taskTime.value = "";
     els.taskLead.value = "";
     updateRepeatFields();
@@ -2467,6 +2562,12 @@ const TOAST_ACTION_MS = 6000;
       rule = `FREQ=WEEKLY;BYDAY=${days[start.getDay()]}`;
     } else if (series.freq === "monthly") {
       rule = `FREQ=MONTHLY;BYMONTHDAY=${start.getDate()}`;
+    } else if (series.freq === "custom-days") {
+      const step = Math.max(1, Math.floor(Number(series.interval) || 1));
+      rule = step === 1 ? "FREQ=DAILY" : `FREQ=DAILY;INTERVAL=${step}`;
+    } else if (series.freq === "custom-weekdays") {
+      const codes = weekdayCodes(series.days);
+      rule = codes.length ? `FREQ=WEEKLY;BYDAY=${codes.join(",")}` : "FREQ=WEEKLY";
     } else {
       rule = `FREQ=YEARLY;BYMONTH=${start.getMonth() + 1};BYMONTHDAY=${start.getDate()}`;
     }
@@ -3269,6 +3370,17 @@ const TOAST_ACTION_MS = 6000;
 
     els.taskRepeat.addEventListener("change", updateRepeatFields);
     els.taskTime.addEventListener("input", updateRepeatFields);
+    els.taskInterval.addEventListener("input", updateRepeatFields);
+    if (els.taskWeekdays) {
+      els.taskWeekdays.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-weekday]");
+        if (!button) return;
+        const on = button.getAttribute("aria-pressed") === "true";
+        button.setAttribute("aria-pressed", on ? "false" : "true");
+        button.classList.toggle("is-on", !on);
+        updateRepeatFields();
+      });
+    }
 
     if (els.quickTimes) {
       els.quickTimes.addEventListener("click", (event) => {

@@ -63,6 +63,59 @@ test("yearly строго в день старта", () => {
   assert.equal(core.isSeriesActiveOn(series, "2026-09-01"), true);
 });
 
+// Аддитивные частоты v4: «каждые N дней» и свой набор дней недели.
+test("custom-days: каждые 3 дня от старта", () => {
+  const series = seriesOf("2026-11-16", "custom-days", { interval: 3 });
+  assert.equal(core.isSeriesActiveOn(series, "2026-11-16"), true);
+  assert.equal(core.isSeriesActiveOn(series, "2026-11-17"), false);
+  assert.equal(core.isSeriesActiveOn(series, "2026-11-18"), false);
+  assert.equal(core.isSeriesActiveOn(series, "2026-11-19"), true);
+  assert.equal(core.isSeriesActiveOn(series, "2026-11-22"), true);
+  assert.equal(core.isSeriesActiveOn(series, "2026-12-16"), true, "шаг считается через границу месяца");
+  assert.equal(core.isSeriesActiveOn(series, "2026-11-15"), false, "до старта серии нет");
+});
+
+test("custom-days без interval не теряется: шаг 1", () => {
+  const series = seriesOf("2026-11-16", "custom-days");
+  assert.equal(core.isSeriesActiveOn(series, "2026-11-16"), true);
+  assert.equal(core.isSeriesActiveOn(series, "2026-11-17"), true);
+  assert.equal(core.isSeriesActiveOn(series, "2026-11-30"), true);
+});
+
+test("custom-days: мусорный interval приводится к 1", () => {
+  const series = seriesOf("2026-11-16", "custom-days", { interval: -5 });
+  assert.equal(core.isSeriesActiveOn(series, "2026-11-17"), true);
+});
+
+test("custom-weekdays: пн-ср-пт", () => {
+  const series = seriesOf("2026-11-16", "custom-weekdays", { days: [1, 3, 5] });
+  const expected = {
+    "2026-11-16": true,  // пн
+    "2026-11-17": false, // вт
+    "2026-11-18": true,  // ср
+    "2026-11-19": false, // чт
+    "2026-11-20": true,  // пт
+    "2026-11-21": false, // сб
+    "2026-11-22": false, // вс
+    "2026-11-23": true   // следующая пн
+  };
+  Object.keys(expected).forEach((iso) => {
+    assert.equal(core.isSeriesActiveOn(series, iso), expected[iso], iso);
+  });
+});
+
+test("custom-weekdays: пустой набор дней не срабатывает", () => {
+  const series = seriesOf("2026-11-16", "custom-weekdays", { days: [] });
+  assert.equal(core.isSeriesActiveOn(series, "2026-11-16"), false);
+  assert.equal(core.isSeriesActiveOn(series, "2026-11-23"), false);
+});
+
+test("custom-weekdays: воскресенье — день 0", () => {
+  const series = seriesOf("2026-11-16", "custom-weekdays", { days: [0] });
+  assert.equal(core.isSeriesActiveOn(series, "2026-11-22"), true);
+  assert.equal(core.isSeriesActiveOn(series, "2026-11-16"), false);
+});
+
 test("границы start и end включительно", () => {
   const series = seriesOf("2027-05-10", "daily", { end: "2027-05-12" });
   assert.equal(core.isSeriesActiveOn(series, "2027-05-09"), false);

@@ -306,6 +306,59 @@ function isoToday() {
       `[...document.querySelectorAll("#taskList .task-item")].some((node) => node.textContent.includes("Смоук: зарядка"))`
     ));
 
+    // 4б. Новые частоты: «каждые N дней» и свой набор дней недели.
+    const customDaysUi = await cdp.eval(`(() => {
+      const repeat = document.querySelector("#taskRepeat");
+      const intervalWrap = document.querySelector("#taskIntervalWrap");
+      const before = { intervalHidden: intervalWrap.hidden, weekdaysHidden: document.querySelector("#taskWeekdays").hidden };
+      document.querySelector("#taskInput").value = "Смоук: через день";
+      repeat.value = "custom-days";
+      repeat.dispatchEvent(new Event("change", { bubbles: true }));
+      const shown = { intervalHidden: intervalWrap.hidden, weekdaysHidden: document.querySelector("#taskWeekdays").hidden };
+      document.querySelector("#taskInterval").value = "2";
+      document.querySelector("#taskInterval").dispatchEvent(new Event("input", { bubbles: true }));
+      document.querySelector("#taskForm").requestSubmit();
+      return { before, shown };
+    })()`);
+    check("серия: поле «каждые N дней» появляется по выбору", customDaysUi.before.intervalHidden
+      && !customDaysUi.shown.intervalHidden && customDaysUi.shown.weekdaysHidden, JSON.stringify(customDaysUi));
+    await cdp.waitFor(`(${readStore})?.series?.some((item) => item.text === "Смоук: через день")`, "серия «каждые N дней» записалась");
+    const customDays = await cdp.eval(`(${readStore}).series.find((item) => item.text === "Смоук: через день")`);
+    check("серия: шаг «каждые 2 дня» сохранён", Boolean(customDays && customDays.freq === "custom-days" && customDays.interval === 2), JSON.stringify(customDays));
+    const stepDays = await cdp.eval(`(() => {
+      const series = (${readStore}).series.find((item) => item.text === "Смоук: через день");
+      const shift = (iso, days) => window.PixelCore.addDaysIso(iso, days);
+      return {
+        today: window.PixelCore.isSeriesActiveOn(series, "${today}"),
+        plus1: window.PixelCore.isSeriesActiveOn(series, shift("${today}", 1)),
+        plus2: window.PixelCore.isSeriesActiveOn(series, shift("${today}", 2)),
+        plus3: window.PixelCore.isSeriesActiveOn(series, shift("${today}", 3))
+      };
+    })()`);
+    check("серия: шаг 2 дня — сегодня и +2 есть, +1 и +3 нет", stepDays.today && stepDays.plus2
+      && !stepDays.plus1 && !stepDays.plus3, JSON.stringify(stepDays));
+
+    const weekdaysUi = await cdp.eval(`(() => {
+      const repeat = document.querySelector("#taskRepeat");
+      document.querySelector("#taskInput").value = "Смоук: пн-ср-пт";
+      repeat.value = "custom-weekdays";
+      repeat.dispatchEvent(new Event("change", { bubbles: true }));
+      const chips = [...document.querySelectorAll("#taskWeekdays [data-weekday]")];
+      const shown = !document.querySelector("#taskWeekdays").hidden;
+      const sunday = chips.find((button) => button.dataset.weekday === "0");
+      sunday.click();
+      const sundayOn = sunday.getAttribute("aria-pressed") === "true";
+      sunday.click();
+      const sundayOff = sunday.getAttribute("aria-pressed") === "false";
+      document.querySelector("#taskForm").requestSubmit();
+      return { shown, sundayOn, sundayOff };
+    })()`);
+    await cdp.waitFor(`(${readStore})?.series?.some((item) => item.text === "Смоук: пн-ср-пт")`, "серия по дням записалась");
+    const daySet = await cdp.eval(`(${readStore}).series.find((item) => item.text === "Смоук: пн-ср-пт")`);
+    check("серия: чипы дней переключаются", weekdaysUi.shown && weekdaysUi.sundayOn && weekdaysUi.sundayOff, JSON.stringify(weekdaysUi));
+    check("серия: набор дней по умолчанию пн-ср-пт сохранён", Boolean(daySet
+      && daySet.freq === "custom-weekdays" && JSON.stringify(daySet.days) === JSON.stringify([1, 3, 5])), JSON.stringify(daySet));
+
     // 5. Удаление обычного дела — могилой, а не вырезанием.
     await cdp.eval(`(() => {
       const row = [...document.querySelectorAll("#taskList .task-item")].find((node) => node.textContent.includes("полить цветы"));
