@@ -1390,7 +1390,7 @@ html[data-holiday="on"] .island-grass {
   height: 17px;
 }
 
-.year-jump.is-2027::after {
+.year-jump.is-current::after {
   content: "";
   position: absolute;
   top: -5px;

@@ -26,6 +26,7 @@
     weekStart: 1,
     morningDigest: false,
     digestTime: "08:00",
+    updateCheck: true,
     templates: [],
     updatedAt: 0
   };
@@ -53,6 +54,10 @@
       ...source,
       morningDigest: source.morningDigest === true,
       digestTime: normalizeDigestTime(source.digestTime),
+      // Единственный исходящий запрос приложения (GitHub API в APK).
+      // Мусор в поле не должен тихо включать сеть: только явный false выключает,
+      // всё остальное — включено по умолчанию, как и раньше.
+      updateCheck: source.updateCheck !== false,
       templates: normalizeTemplates(source.templates),
       updatedAt: timeMs(source.updatedAt)
     };

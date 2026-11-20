@@ -38,6 +38,7 @@
     weekStart: 1,
     morningDigest: false,
     digestTime: DIGEST_TIME_DEFAULT,
+    updateCheck: true,
     templates: []
   };
   const REPEATS = ["none", "daily", "weekdays", "weekly", "monthly", "yearly", "custom-days", "custom-weekdays"];
@@ -106,6 +107,7 @@
     nextBtn: document.getElementById("nextBtn"),
     todayBtn: document.getElementById("todayBtn"),
     yearJumpBtn: document.getElementById("yearJumpBtn"),
+    yearJumpLabel: document.querySelector("#yearJumpBtn .year-jump-label"),
     periodKicker: document.getElementById("periodKicker"),
     periodTitle: document.getElementById("periodTitle"),
     progressCard: document.getElementById("progressCard"),
@@ -165,6 +167,9 @@
     digestRow: document.getElementById("digestRow"),
     digestToggle: document.getElementById("digestToggle"),
     digestTime: document.getElementById("digestTime"),
+    updateCheckRow: document.getElementById("updateCheckRow"),
+    updateCheckToggle: document.getElementById("updateCheckToggle"),
+    updateCheckNote: document.getElementById("updateCheckNote"),
     snow: document.querySelector(".snow"),
     decorToggle: document.getElementById("decorToggle"),
     settingsBuild: document.getElementById("settingsBuild"),
@@ -520,6 +525,7 @@ const TOAST_ACTION_MS = 6000;
         weekStart: rawSettings.weekStart === 0 ? 0 : 1,
         morningDigest: rawSettings.morningDigest === true,
         digestTime: normalizeDigestTimeValue(rawSettings.digestTime),
+        updateCheck: rawSettings.updateCheck !== false,
         templates: normalizeTemplates(rawSettings.templates),
         updatedAt: Number(rawSettings.updatedAt) || 0
       }
@@ -977,7 +983,14 @@ const TOAST_ACTION_MS = 6000;
     const copy = periodCopy();
     numberize(els.periodKicker, copy.kicker);
     numberize(els.periodTitle, copy.title);
-    els.yearJumpBtn.classList.toggle("is-2027", state.cursor.getFullYear() === 2027);
+    const year = new Date().getFullYear();
+    els.yearJumpBtn.classList.toggle("is-current", state.cursor.getFullYear() === year);
+    // Подпись и обе подсказки — из календаря, а не из константы: год меняется,
+    // кнопка не должна врать ни 1 января, ни после него.
+    if (els.yearJumpLabel && els.yearJumpLabel.textContent !== String(year)) {
+      els.yearJumpLabel.textContent = String(year);
+      els.yearJumpBtn.setAttribute("aria-label", `Перейти к ${year} году`);
+    }
   }
 
   function renderQuickAddDate() {
@@ -1438,11 +1451,14 @@ const TOAST_ACTION_MS = 6000;
     showToast("Вернулись к актуальной дате");
   }
 
-  function goTo2027() {
-    state.cursor = new Date(2027, 0, 1);
-    state.selectedDate = "2027-01-01";
+  // Кнопка года не привязана к 2027: 1 января 2028 она должна вести в новый год,
+  // а не в прошлое. Подпись и aria-label строятся из текущего года в renderPeriod.
+  function goToCurrentYear() {
+    const year = new Date().getFullYear();
+    state.cursor = new Date(year, 0, 1);
+    state.selectedDate = `${year}-01-01`;
     renderAll(true);
-    showToast("Открыт 2027 год");
+    showToast(`Открыт ${year} год`);
   }
 
   function showDialog(dialog) {
@@ -2345,12 +2361,16 @@ const TOAST_ACTION_MS = 6000;
     els.skySelect.value = state.settings.sky;
     els.holidaySelect.value = state.settings.holiday;
     els.digestToggle.checked = state.settings.morningDigest;
+    if (els.updateCheckToggle) els.updateCheckToggle.checked = updateCheckEnabled();
     if (els.digestTime) {
       els.digestTime.value = state.settings.digestTime;
       els.digestTime.disabled = !state.settings.morningDigest;
     }
     // В браузере системных уведомлений нет — не обещаем сводку.
     els.digestRow.hidden = !isNativeApp();
+    // Проверка обновлений — только в APK, в вебе сеть не используется вовсе.
+    if (els.updateCheckRow) els.updateCheckRow.hidden = !isNativeApp();
+    if (els.updateCheckNote) els.updateCheckNote.hidden = !isNativeApp();
     if (els.templatesInput) els.templatesInput.value = state.settings.templates.join("\n");
   }
 
@@ -2525,7 +2545,7 @@ const TOAST_ACTION_MS = 6000;
       series: state.series,
       settings: state.settings
     };
-    const name = `pixel-calendar-2027-backup-${toISO(new Date())}.json`;
+    const name = `pixel-calendar-backup-${toISO(new Date())}.json`;
     const text = JSON.stringify(payload, null, 2);
     // На телефоне сохранение делает нативный метод — в общую папку «Загрузки».
     // Тост показывает путь, иначе «копия скачана» звучит как обещание, которого не видно.
@@ -2598,10 +2618,10 @@ const TOAST_ACTION_MS = 6000;
     const lines = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
-      "PRODID:-//Pixel Calendar 2027//RU",
+      "PRODID:-//Pixel Calendar//RU",
       "CALSCALE:GREGORIAN",
       "METHOD:PUBLISH",
-      "X-WR-CALNAME:Пиксельный календарь 2027"
+      "X-WR-CALNAME:Пиксельный календарь"
     ];
 
     Object.keys(state.tasks).sort().forEach((iso) => {
@@ -2648,7 +2668,7 @@ const TOAST_ACTION_MS = 6000;
   }
 
   function exportICS() {
-    const name = `pixel-calendar-2027-${toISO(new Date())}.ics`;
+    const name = `pixel-calendar-${toISO(new Date())}.ics`;
     saveFileOnDevice(name, buildICS(), "text/calendar;charset=utf-8").then((result) => {
       if (!result.ok) {
         showToast("Не удалось сохранить файл. Попробуйте ещё раз.");
@@ -3105,7 +3125,7 @@ const TOAST_ACTION_MS = 6000;
     els.prevBtn.addEventListener("click", () => shiftPeriod(-1));
     els.nextBtn.addEventListener("click", () => shiftPeriod(1));
     els.todayBtn.addEventListener("click", goToToday);
-    els.yearJumpBtn.addEventListener("click", goTo2027);
+    els.yearJumpBtn.addEventListener("click", goToCurrentYear);
 
     els.quickAddForm.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -3559,6 +3579,14 @@ const TOAST_ACTION_MS = 6000;
       saveStore();
     });
 
+    if (els.updateCheckToggle) {
+      els.updateCheckToggle.addEventListener("change", () => {
+        state.settings.updateCheck = els.updateCheckToggle.checked;
+        saveStore();
+        applyUpdateCheckSetting();
+      });
+    }
+
     if (els.digestTime) {
       els.digestTime.addEventListener("change", () => {
         state.settings.digestTime = normalizeDigestTimeValue(els.digestTime.value);
@@ -3998,7 +4026,7 @@ const TOAST_ACTION_MS = 6000;
       showToast("Сохранять нечего");
       return;
     }
-    const name = `pixel-calendar-2027-raw-${new Date().toISOString().slice(0, 10)}.json`;
+    const name = `pixel-calendar-raw-${new Date().toISOString().slice(0, 10)}.json`;
     saveFileOnDevice(name, source, "application/json").then((result) => {
       if (!result.ok) {
         showToast("Не удалось сохранить копию. Попробуйте ещё раз.");
@@ -4083,15 +4111,38 @@ const TOAST_ACTION_MS = 6000;
       });
   }
 
+  function updateCheckEnabled() {
+    return state.settings.updateCheck !== false;
+  }
+
   function setupAppUpdateCheck() {
     if (!isNativeApp() || !currentVersion()) return;
+    // Выключатель только в APK: веб-версия в GitHub не ходит вовсе.
+    if (els.updateCheckRow) els.updateCheckRow.hidden = false;
+    if (els.updateCheckNote) els.updateCheckNote.hidden = false;
+    if (els.updateCheckToggle) els.updateCheckToggle.checked = updateCheckEnabled();
     const cached = readReleaseCache();
+    if (!updateCheckEnabled()) return;
     if (cached && cached.version) offerAppRelease(cached.version, RELEASE_APK);
     if (shouldRecheckRelease(cached)) window.setTimeout(refreshRelease, cached ? 1500 : 4000);
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState !== "visible") return;
+      if (!updateCheckEnabled()) return;
       if (shouldRecheckRelease(readReleaseCache())) refreshRelease();
     });
+  }
+
+  // Переключение выключателя: выключили — снимаем плашку и молчим до включения;
+  // включили — не ждём полчаса, а проверяем сразу (кэш всё равно уважается).
+  function applyUpdateCheckSetting() {
+    if (!isNativeApp() || !currentVersion()) return;
+    if (!updateCheckEnabled()) {
+      hideUpdateBar();
+      return;
+    }
+    const cached = readReleaseCache();
+    if (cached && cached.version) offerAppRelease(cached.version, RELEASE_APK);
+    if (shouldRecheckRelease(cached)) refreshRelease();
   }
 
   function setupWidgetToggles() {

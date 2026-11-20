@@ -868,6 +868,41 @@ function isoToday() {
     })()`);
     await sleep(200);
 
+    // Кнопка года: подпись и переход берутся из календаря, а не из константы 2027 —
+    // иначе 1 января 2028 она ведёт в прошлое.
+    const yearBtn = await cdp.eval(`(() => {
+      const button = document.getElementById("yearJumpBtn");
+      const label = button.querySelector(".year-jump-label");
+      const currentYear = new Date().getFullYear();
+      const before = { text: label ? label.textContent.trim() : "", aria: button.getAttribute("aria-label") || "" };
+      document.getElementById("nextBtn").click();
+      document.getElementById("nextBtn").click();
+      const offCurrent = button.classList.contains("is-current");
+      document.getElementById("yearJumpBtn").click();
+      const title = document.getElementById("periodTitle").textContent || "";
+      return {
+        currentYear,
+        before,
+        offCurrent,
+        afterTitle: title,
+        backOnCurrent: button.classList.contains("is-current"),
+        ariaAfter: button.getAttribute("aria-label") || ""
+      };
+    })()`);
+    check("кнопка года: подпись — текущий год", yearBtn.before.text === String(yearBtn.currentYear), JSON.stringify(yearBtn.before));
+    check("кнопка года: подсказка называет текущий год", yearBtn.before.aria.includes(String(yearBtn.currentYear)), yearBtn.before.aria);
+    check("кнопка года: ушёл в другой год — метка снята", yearBtn.offCurrent === false, String(yearBtn.offCurrent));
+    check("кнопка года: возвращает в текущий год", yearBtn.backOnCurrent === true
+      && yearBtn.afterTitle.includes(String(yearBtn.currentYear)), `${yearBtn.backOnCurrent} / ${yearBtn.afterTitle}`);
+
+    // Проверка обновлений — единственный исходящий запрос, и он только в APK.
+    // В браузере выключателя нет, потому что и запроса нет.
+    const updateRow = await cdp.eval(`(() => {
+      const row = document.getElementById("updateCheckRow");
+      return { exists: Boolean(row), hidden: row ? row.hidden : null };
+    })()`);
+    check("обновления: в браузере выключателя нет (и запроса тоже)", updateRow.exists && updateRow.hidden === true, JSON.stringify(updateRow));
+
     check("ошибок в консоли нет", consoleErrors.length === 0, consoleErrors.join(" | "));
     check("падений JS нет", exceptions.length === 0, exceptions.join(" | "));
   } catch (error) {

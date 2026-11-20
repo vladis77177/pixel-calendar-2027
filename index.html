@@ -267,7 +267,7 @@
           </div>
           <button class="pixel-btn year-jump" id="yearJumpBtn" type="button" aria-label="Перейти к 2027 году">
             <span class="year-jump-star" aria-hidden="true"><svg class="icon"><use href="#i-sparkle"></use></svg></span>
-            2027
+            <span class="year-jump-label">2027</span>
           </button>
         </div>
 
@@ -623,6 +623,12 @@
             </button>
           </div>
           <p class="settings-note" id="installNote">Если браузер поддерживает установку, кнопка появится автоматически.</p>
+          <label class="toggle-row" id="updateCheckRow" hidden>
+            <input type="checkbox" id="updateCheckToggle" checked>
+            <span class="toggle-mark" aria-hidden="true"></span>
+            <span>Проверять обновления</span>
+          </label>
+          <p class="settings-note" id="updateCheckNote" hidden>Раз в полчаса приложение спрашивает у GitHub номер последней версии — уходит только запрос, без задач и настроек. Выключите, и сеть не используется вовсе.</p>
         </section>
 
         <section class="settings-section">

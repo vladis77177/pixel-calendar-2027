@@ -89,9 +89,11 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "::warning::Signing secrets are missing — the APK will be signed with a throwaway debug key and will not update over previous installs."
-            echo "signed=no" >> "$GITHUB_OUTPUT"
-            exit 0
+            # Основная сборка для людей — release с постоянным ключом. Без ключа
+            # публиковать нечего: debug с одноразовой подписью не обновится
+            # поверх и молча подменит собой нормальную сборку. Поэтому падаем.
+            echo "::error::Signing secrets are missing — a release APK cannot be built. Add KEYSTORE_BASE64/KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD."
+            exit 1
           fi
           echo "$KEYSTORE_BASE64" | base64 -d > android/app/pixel-release.p12
           cat > android/keystore.properties <<EOF
@@ -124,18 +126,16 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace
-          if [ -f keystore.properties ]; then
-            ./gradlew assembleRelease --no-daemon --stacktrace
-          else
-            echo "::warning::Release build skipped: signing secrets are missing."
+          if [ ! -f keystore.properties ]; then
+            echo "::error::keystore.properties is missing — release build is the one users install, it must not be skipped."
+            exit 1
           fi
+          ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Copy APK
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk pixel-calendar-2027-debug.apk
-          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
-            cp android/app/build/outputs/apk/release/app-release.apk pixel-calendar-2027-release.apk
-          fi
+          cp android/app/build/outputs/apk/release/app-release.apk pixel-calendar-2027-release.apk
 
       - name: Report APK signature and flags
         run: |
@@ -154,7 +154,7 @@ jobs:
               "$AAPT" dump xmltree --file AndroidManifest.xml "$apk" | grep -i "debuggable" || echo "debuggable=true (не задан)"
             fi
           done
-          test -f pixel-calendar-2027-release.apk || { echo "::notice::Release APK is absent (no signing key): publishing the debug build only."; }
+          test -f pixel-calendar-2027-release.apk || { echo "::error::Release APK is absent — nothing to install for users."; exit 1; }
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
@@ -169,7 +169,7 @@ jobs:
         with:
           name: pixel-calendar-2027-release
           path: pixel-calendar-2027-release.apk
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 90
 
       - name: Publish GitHub release
@@ -180,8 +180,8 @@ jobs:
           RELEASE_APK=pixel-calendar-2027-release.apk
           DEBUG_APK=pixel-calendar-2027-debug.apk
           if [ ! -f "$RELEASE_APK" ]; then
-            echo "::warning::Release APK is missing (signing secrets not set) — tag $GITHUB_REF_NAME is not published."
-            exit 0
+            echo "::error::Release APK is missing — a tag must never publish a debug-only release."
+            exit 1
           fi
           VERSION="$(node -p "require('./package.json').version")"
           AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt2 -type f | sort | tail -1)"
@@ -207,6 +207,6 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" "$RELEASE_APK" "$DEBUG_APK" \
               --verify-tag --latest \
-              --title "v$VERSION — Pixel Calendar 2027" \
+              --title "v$VERSION — Pixel Calendar" \
               --notes-file release-notes.md
           fi

@@ -41,6 +41,7 @@ function state(tasks, series, settings) {
       weekStart: 1,
       morningDigest: false,
       digestTime: "08:00",
+      updateCheck: true,
       templates: [],
       updatedAt: 0,
       ...(settings || {})
@@ -149,6 +150,24 @@ test("новые частоты переживают слияние и синх�
   const merged = mergeStates(local, remote);
   assert.equal(merged.series[0].interval, 2);
   assert.deepEqual(merged.series[0].days, []);
+});
+
+test("updateCheck: по умолчанию включён, явный false выключает, мусор не глушит", () => {
+  const fresh = migrateState({ settings: {} });
+  assert.equal(fresh.settings.updateCheck, true, "старая схема без поля — проверка работает как раньше");
+  const off = migrateState({ settings: { updateCheck: false } });
+  assert.equal(off.settings.updateCheck, false);
+  const on = migrateState({ settings: { updateCheck: true } });
+  assert.equal(on.settings.updateCheck, true);
+  ["", 0, null, "нет", []].forEach((junk) => {
+    assert.equal(migrateState({ settings: { updateCheck: junk } }).settings.updateCheck, true, `мусор ${JSON.stringify(junk)} не выключает сеть`);
+  });
+});
+
+test("updateCheck переживает слияние с других устройств", () => {
+  const local = state({}, [], { updateCheck: false, updatedAt: 200 });
+  const remote = state({}, [], { updatedAt: 100 });
+  assert.equal(mergeStates(local, remote).settings.updateCheck, false);
 });
 
 test("LWW: побеждает более поздняя правка задачи", () => {
