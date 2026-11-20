@@ -256,6 +256,105 @@ for (const density of ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"]) {
   if (fs.existsSync(statIcon)) check(fs.statSync(statIcon).size > 100, `Empty drawable-${density}/ic_stat_calendar.png`);
 }
 
+// Живой значок ярлыка: 31 alias, включён ровно один, у каждого иконка дня ведёт
+// на адаптивную разметку, а её foreground — на layer-list «основа + число».
+const aliasMatches = manifest.match(/<activity-alias[\s\S]*?<\/activity-alias>/g) || [];
+check(aliasMatches.length === 31, `activity-alias должно быть 31, найдено ${aliasMatches.length}`);
+for (let day = 1; day <= 31; day += 1) {
+  check(manifest.includes(`android:name=".Day${day}"`), `В манифесте нет alias .Day${day} — ярлык дня ${day} не соберётся`);
+  check(
+    manifest.includes(`android:icon="@mipmap/ic_launcher_day_${day}"`),
+    `alias .Day${day}: android:icon не ведёт на @mipmap/ic_launcher_day_${day}`
+  );
+  check(
+    manifest.includes(`android:roundIcon="@mipmap/ic_launcher_day_${day}"`),
+    `alias .Day${day}: android:roundIcon не ведёт на @mipmap/ic_launcher_day_${day}`
+  );
+}
+for (const block of aliasMatches) {
+  const nameMatch = block.match(/android:name="\.Day(\d+)"/);
+  const enabled = /android:enabled="true"/.test(block);
+  if (!enabled) continue;
+  check(
+    nameMatch && nameMatch[1] === "1",
+    "Включённым на старте должен быть ровно один alias — .Day1"
+  );
+}
+const enabledAliases = aliasMatches.filter((block) => /android:enabled="true"/.test(block));
+check(enabledAliases.length === 1, `включённых activity-alias должно быть ровно один, найдено ${enabledAliases.length}`);
+
+const dayIconReceiver = read(`java/${PACKAGE.split(".").join("/")}/DayIconReceiver.java`);
+const dayIconSwitcher = read(`java/${PACKAGE.split(".").join("/")}/DayIconSwitcher.java`);
+check(
+  manifest.includes(".DayIconReceiver"),
+  "DayIconReceiver не зарегистрирован в AndroidManifest.xml — значок не догонит смену дня"
+);
+for (const action of ["DATE_CHANGED", "TIME_CHANGED", "TIMEZONE_CHANGED", "BOOT_COMPLETED"]) {
+  check(
+    dayIconReceiver.includes(`Intent.ACTION_${action}`),
+    `DayIconReceiver не слушает ACTION_${action}`
+  );
+}
+check(
+  manifest.includes('android:name=".DayIconReceiver"'),
+  "В манифесте нет receiver .DayIconReceiver с именем .DayIconReceiver"
+);
+check(
+  dayIconSwitcher.includes("setComponentEnabledSetting"),
+  "DayIconSwitcher должен переключать alias через setComponentEnabledSetting"
+);
+check(
+  mainActivity.includes("DayIconSwitcher.apply"),
+  "MainActivity.onCreate должен вызывать DayIconSwitcher.apply(this), иначе значок не догонит дату при запуске"
+);
+
+// Ярлык запуска должен принадлежать ровно одному компоненту: у самой MainActivity
+// его быть не должно, иначе в лончере два значка — живой и статичный.
+const mainActivityBlock = (manifest.match(/<activity[\s\S]*?android:name="\.MainActivity"[\s\S]*?<\/activity>/) || [""])[0];
+check(
+  !mainActivityBlock.includes("android.intent.category.LAUNCHER"),
+  "У MainActivity остался intent-filter LAUNCHER — в лончере будет два ярлыка вместо одного живого"
+);
+// Ярлыки долгого нажатия объявляет тот компонент, который несёт MAIN/LAUNCHER.
+const launcherAliasBlock = (manifest.match(/<activity-alias[\s\S]*?android:enabled="true"[\s\S]*?<\/activity-alias>/) || [""])[0];
+check(
+  launcherAliasBlock.includes("android.app.shortcuts"),
+  "Включённый alias не объявляет android.app.shortcuts — ярлыки долгого нажатия пропадут"
+);
+
+for (let day = 1; day <= 31; day += 1) {
+  const adaptive = path.join(APP, "res", "mipmap-anydpi-v26", `ic_launcher_day_${day}.xml`);
+  check(fs.existsSync(adaptive), `Нет mipmap-anydpi-v26/ic_launcher_day_${day}.xml: alias .Day${day} указывает на несуществующий ресурс`);
+  if (!fs.existsSync(adaptive)) continue;
+  const adaptiveBody = fs.readFileSync(adaptive, "utf8");
+  check(
+    adaptiveBody.includes("@color/ic_launcher_background"),
+    `ic_launcher_day_${day}.xml: background должен быть @color/ic_launcher_background`
+  );
+  check(
+    adaptiveBody.includes(`@drawable/ic_launcher_day_${day}_foreground`),
+    `ic_launcher_day_${day}.xml: foreground должен вести на @drawable/ic_launcher_day_${day}_foreground`
+  );
+  const layerList = path.join(APP, "res", "drawable-xxhdpi", `ic_launcher_day_${day}_foreground.xml`);
+  check(fs.existsSync(layerList), `Нет drawable-xxhdpi/ic_launcher_day_${day}_foreground.xml`);
+  if (fs.existsSync(layerList)) {
+    const layerBody = fs.readFileSync(layerList, "utf8");
+    check(
+      layerBody.includes("@mipmap/ic_launcher_foreground"),
+      `ic_launcher_day_${day}_foreground.xml: layer-list должен накладывать основу @mipmap/ic_launcher_foreground`
+    );
+    check(
+      layerBody.includes(`@drawable/ic_day_number_${day}`),
+      `ic_launcher_day_${day}_foreground.xml: layer-list должен накладывать @drawable/ic_day_number_${day}`
+    );
+  }
+  const numberPng = path.join(APP, "res", "drawable-xxhdpi", `ic_day_number_${day}.png`);
+  check(fs.existsSync(numberPng), `Нет drawable-xxhdpi/ic_day_number_${day}.png — число дня ${day} не отрисуется`);
+  if (fs.existsSync(numberPng)) check(fs.statSync(numberPng).size > 100, `Пустой drawable-xxhdpi/ic_day_number_${day}.png`);
+  const legacy = path.join(APP, "res", "mipmap-xxxhdpi", `ic_launcher_day_${day}.png`);
+  check(fs.existsSync(legacy), `Нет mipmap-xxxhdpi/ic_launcher_day_${day}.png`);
+}
+
 const buildGradle = fs.readFileSync(path.join(ROOT, "android", "app", "build.gradle"), "utf8");
 check(buildGradle.includes(`namespace = "${PACKAGE}"`), "Gradle namespace does not match appId");
 check(buildGradle.includes(`applicationId "${PACKAGE}"`), "Gradle applicationId does not match appId");

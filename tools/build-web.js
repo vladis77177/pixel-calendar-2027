@@ -11,6 +11,7 @@ const FILES = [
   "styles.css",
   "app.mobile.css",
   "core.js",
+  "sign.js",
   "boot.js",
   "app.js",
   "update.js",
@@ -41,8 +42,7 @@ const swSource = fs.readFileSync(swPath, "utf8");
 const swBuilt = swSource.replace(
   /const CACHE_NAME = "pixel-calendar-2027-v\d+";/,
   `const CACHE_NAME = "pixel-calendar-2027-v${version}";`
-);
-if (swBuilt === swSource) {
+);if (swBuilt === swSource) {
   throw new Error("sw.js: не нашёл CACHE_NAME — привязка кэша к версии сломана");
 }
 fs.writeFileSync(swPath, swBuilt);

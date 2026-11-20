@@ -1453,6 +1453,13 @@ const TOAST_ACTION_MS = 6000;
 
   // Кнопка года не привязана к 2027: 1 января 2028 она должна вести в новый год,
   // а не в прошлое. Подпись и aria-label строятся из текущего года в renderPeriod.
+  // Знак в шапке: разметка из sign.js, день ставится по календарю устройства.
+  function renderBrandSign() {
+    const host = document.querySelector(".logo-block");
+    if (!host || !window.PixelSign) return;
+    host.innerHTML = window.PixelSign.useMarkup(new Date().getDate());
+  }
+
   function goToCurrentYear() {
     const year = new Date().getFullYear();
     state.cursor = new Date(year, 0, 1);
@@ -4395,6 +4402,11 @@ const TOAST_ACTION_MS = 6000;
     setupAppUpdateCheck();
     setupWidgetToggles();
     setupAndroidBack();
+    renderBrandSign();
+    // День меняется и при открытом приложении: возвращаемся к экрану — знак догоняет дату.
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible") renderBrandSign();
+    });
     renderAll(true);
     setupSnowman();
     document.fonts.ready.then(scheduleFitMonth);

@@ -3,7 +3,8 @@
 // Usage: node tools/patch-android.js
 const fs = require("fs");
 const path = require("path");
-const { writePng, drawBlock } = require("./make-icons");
+const { writePng, drawGrid, staticGrid, dayNumberGrid, COLORS, writeDayLauncherIcons } = require("./make-icons");
+const { aliasBlock } = require("./day-icon-manifest");
 
 const ROOT = path.join(__dirname, "..");
 const CONFIG = JSON.parse(fs.readFileSync(path.join(ROOT, "capacitor.config.json"), "utf8"));
@@ -38,7 +39,7 @@ function readNative(file) {
 const packageDir = path.join(APP, "java", ...PACKAGE.split("."));
 fs.mkdirSync(packageDir, { recursive: true });
 
-for (const file of ["WidgetBridgePlugin.java", "CalendarWidgetProvider.java", "WidgetToggleReceiver.java", "MainActivity.java"]) {
+for (const file of ["WidgetBridgePlugin.java", "CalendarWidgetProvider.java", "WidgetToggleReceiver.java", "DayIconSwitcher.java", "DayIconReceiver.java", "MainActivity.java"]) {
   fs.writeFileSync(path.join(packageDir, file), readNative(file));
 }
 
@@ -54,18 +55,64 @@ fs.cpSync(
   { recursive: true }
 );
 
-// 3. Launcher icons (legacy + adaptive foreground) generated from the same pixel art
-const DENSITIES = { mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 };for (const [folder, size] of Object.entries(DENSITIES)) {
+// 3. Иконки приложения: тот же знак, что в шапке (sign.js), а не отдельная копия
+// пиксель-арта. Legacy PNG для старых Android, adaptive foreground для 8+.
+const DENSITIES = { mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 };
+for (const [folder, size] of Object.entries(DENSITIES)) {
   const dir = path.join(APP, "res", `mipmap-${folder}`);
   fs.mkdirSync(dir, { recursive: true });
-  writePng(path.join(dir, "ic_launcher.png"), size, size, drawBlock(size, 0.82, 0, "#8bd8ff"));
-  writePng(path.join(dir, "ic_launcher_round.png"), size, size, drawBlock(size, 0.82, 0, "#8bd8ff"));
+  writePng(path.join(dir, "ic_launcher.png"), size, size, drawGrid(staticGrid(), COLORS, size, 0.82, 0, "#8bd8ff"));
+  writePng(path.join(dir, "ic_launcher_round.png"), size, size, drawGrid(staticGrid(), COLORS, size, 0.82, 0, "#8bd8ff"));
   const foreground = Math.round(size * 2.25);
   writePng(
     path.join(dir, "ic_launcher_foreground.png"),
     foreground,
     foreground,
-    drawBlock(foreground, 0.62)
+    drawGrid(staticGrid(), COLORS, foreground, 0.62)
+  );
+}
+
+// 3a. Живой значок ярлыка: на иконке — число текущего дня месяца. Legacy PNG на
+// каждый день, адаптивная разметка и layer-list «основа + число». Число — один
+// маленький PNG в xxhdpi, остальное — XML: Android сам масштабирует под плотность,
+// поэтому 155 копий иконки не плодятся.
+const DAY_COUNT = PixelSign.DAYS_IN_MONTH;
+for (const [folder, size] of Object.entries(DENSITIES)) {
+  writeDayLauncherIcons(path.join(APP, "res", `mipmap-${folder}`), size, "#8bd8ff");
+}
+const anydpiDir = path.join(APP, "res", "mipmap-anydpi-v26");
+const dayDrawableDir = path.join(APP, "res", "drawable-xxhdpi");
+fs.mkdirSync(anydpiDir, { recursive: true });
+fs.mkdirSync(dayDrawableDir, { recursive: true });
+for (let day = 1; day <= DAY_COUNT; day += 1) {
+  fs.writeFileSync(
+    path.join(anydpiDir, `ic_launcher_day_${day}.xml`),
+    `<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_day_${day}_foreground" />
+</adaptive-icon>
+`
+  );
+  fs.writeFileSync(
+    path.join(dayDrawableDir, `ic_launcher_day_${day}_foreground.xml`),
+    `<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@mipmap/ic_launcher_foreground" />
+    <item android:drawable="@drawable/ic_day_number_${day}" />
+</layer-list>
+`
+  );
+  // Число — чернилами знака на прозрачном фоне: на бумажной странице белая
+  // цифра была бы невидимой, поэтому цвет берётся из палитры знака. Холст и
+  // масштаб совпадают с foreground-основой (xxhdpi × 2.25, 0.62), иначе число
+  // село бы мимо бумажной страницы: layer-list масштабирует слои по плотности.
+  const numberCanvas = Math.round(DENSITIES.xxhdpi * 2.25);
+  writePng(
+    path.join(dayDrawableDir, `ic_day_number_${day}.png`),
+    numberCanvas,
+    numberCanvas,
+    drawGrid(dayNumberGrid(day), COLORS, numberCanvas, 0.62)
   );
 }
 
@@ -141,8 +188,10 @@ function drawSplash(width, height, night) {
     }
   }
 
+  // Знак на стартовом экране — тот же, что в шапке и на иконке, без числа:
+  // в сплэше размер произвольный, а цифра на нём читается по-разному.
   const block = Math.round(Math.min(width, height) * 0.42);
-  const art = drawBlock(block, 0.82);
+  const art = drawGrid(staticGrid(), COLORS, block, 0.82);
   const startX = Math.floor((width - block) / 2);
   const startY = Math.floor((height - block) / 2);
   for (let y = 0; y < block; y += 1) {
@@ -287,6 +336,45 @@ if (!manifest.includes(".WidgetToggleReceiver")) {
         </receiver>
 `;
   manifest = manifest.replace("</application>", `${toggleReceiver}    </application>`);
+}
+
+// Живой значок ярлыка: смена дня переключает activity-alias, как виджет узнаёт о дате.
+if (!manifest.includes(".DayIconReceiver")) {
+  const dayReceiver = `
+        <receiver
+            android:name=".DayIconReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+`;
+  manifest = manifest.replace("</application>", `${dayReceiver}    </application>`);
+}
+
+// 31 alias ярлыка (Day1…Day31) с иконкой дня; включён ровно один.
+if (!manifest.includes('android:name=".Day1"')) {
+  manifest = manifest.replace("    </application>", `${aliasBlock()}\n    </application>`);
+}
+
+// Ярлык запуска принадлежит alias, а не самой Activity: иначе в лончере видно два
+// значка — живой и обычный. MainActivity остаётся целью alias (targetActivity) и
+// по-прежнему exported, поэтому запуск и ярлыки долгого нажатия не страдают.
+if (manifest.includes('android:name=".Day1"')) {
+  manifest = manifest.replace(
+    /(<activity[\s\S]*?android:name="\.MainActivity"[\s\S]*?>)([\s\S]*?)(<\/activity>)/,
+    (whole, head, body, tail) => {
+      if (!body.includes("android.intent.category.LAUNCHER")) return whole;
+      const cleaned = body.replace(
+        /\s*<intent-filter>[\s\S]*?android\.intent\.category\.LAUNCHER[\s\S]*?<\/intent-filter>/,
+        ""
+      );
+      return head + cleaned + tail;
+    }
+  );
 }
 
 // Ярлыки долгого нажатия: ссылка на файл shortcuts.xml в MainActivity.

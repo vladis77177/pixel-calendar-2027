@@ -5,6 +5,7 @@ const ASSETS = [
   "./styles.css",
   "./app.mobile.css",
   "./core.js",
+  "./sign.js",
   "./boot.js",
   "./app.js",
   "./update.js",

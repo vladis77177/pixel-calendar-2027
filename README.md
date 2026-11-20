@@ -187,9 +187,9 @@ npm run sync
 ```text
 npm ci
 npm run check            # синтаксис всех JS-файлов
-npm test                 # 145 проверок: слияние и сервер, напоминания, статистика серий, правила повтора и естественный ввод
+npm test                 # 152 проверки: слияние и сервер, напоминания, статистика серий, правила повтора, естественный ввод и знак
 npm run build:web        # копирует сайт в www/
-npm run smoke            # 73 проверки в живом Chrome
+npm run smoke            # 74 проверки в живом Chrome
 npx cap add android      # создаёт Android-проект Capacitor 8
 node tools/patch-android.js
 ./gradlew assembleDebug  # собирает debug APK (и release, если есть keystore.properties)
@@ -296,13 +296,14 @@ APK появится в `android/app/build/outputs/apk/debug/app-debug.apk`. Е�
 - `app.mobile.css` — профили интерфейса: мобильный режим, плотность, анимации, декор.
 - `app.js` — календарь, задачи, повторы, поиск, настройки, экспорт.
 - `core.js` — общий домен: работа с датами, правила повтора, склонения, разбор естественного ввода.
+- `sign.js` — знак календаря («грядка с календарём») и пиксельные цифры 1–31: один источник графики для шапки, favicon и иконок APK.
 - `widget.html`, `widget.css`, `widget-night.css`, `widget.js` — мини-виджет «Сегодня» (день и ночь).
 - `sync.js` — миграция схемы и слияние состояний.
 - `update.js` — сравнение версий для плашки обновлений.
 - `notifications.js` — напоминания через Capacitor Local Notifications.
 - `sync-server/server.js` — домашний сервер синхронизации и статика.
 - `tests/` — тесты слияния, сервера, напоминаний, статистики, домена и естественного ввода (`npm test`).
-- `tools/smoke.js` — прогон 50 сценариев в живом Chrome (`npm run smoke`).
+- `tools/smoke.js` — прогон 74 проверок в живом Chrome (`npm run smoke`).
 - `.github/ISSUE_TEMPLATE/` — формы обращений «Проблема» и «Идея» (их открывают кнопки в настройках).
 - `PRIVACY.md` — политика конфиденциальности отдельным документом (для сторов и проверок).
 - `manifest.webmanifest` — параметры PWA.

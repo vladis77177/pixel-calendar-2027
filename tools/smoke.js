@@ -903,6 +903,27 @@ function isoToday() {
     })()`);
     check("обновления: в браузере выключателя нет (и запроса тоже)", updateRow.exists && updateRow.hidden === true, JSON.stringify(updateRow));
 
+    // Знак в шапке: число = текущий день. Источник графики один (sign.js), поэтому
+    // проверяем не «похоже», а точное совпадение с разметкой того же генератора.
+    const brandSign = await cdp.eval(`(() => {
+      const group = document.getElementById("brandDayNumber");
+      const sign = window.PixelSign;
+      if (!group || !sign) return { ok: false, why: group ? "нет window.PixelSign" : "нет группы числа" };
+      // innerHTML переписывает <rect/> как <rect></rect>, поэтому сравниваем
+      // не строку, а сами прямоугольники: и живой знак, и эталон проходят DOM.
+      const coords = (host) => Array.from(host.querySelectorAll("rect"))
+        .map((r) => r.getAttribute("x") + "," + r.getAttribute("y")).join(" ");
+      const doc = new DOMParser().parseFromString(sign.useMarkup(new Date().getDate()), "image/svg+xml");
+      const expected = doc.getElementById("brandDayNumber");
+      return {
+        ok: Boolean(expected) && coords(group) === coords(expected),
+        day: new Date().getDate(),
+        rects: group.querySelectorAll("rect").length,
+        expectedRects: expected ? expected.querySelectorAll("rect").length : 0
+      };
+    })()`);
+    check("знак в шапке: число равно текущему дню", brandSign.ok === true, JSON.stringify(brandSign));
+
     check("ошибок в консоли нет", consoleErrors.length === 0, consoleErrors.join(" | "));
     check("падений JS нет", exceptions.length === 0, exceptions.join(" | "));
   } catch (error) {
