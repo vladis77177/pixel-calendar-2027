@@ -34,7 +34,7 @@ jobs:
       - name: Run browser smoke
         run: npm run smoke
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: www
 
