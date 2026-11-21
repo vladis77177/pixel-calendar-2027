@@ -3616,17 +3616,10 @@ const TOAST_ACTION_MS = 6000;
     if (els.perfCopyBtn) els.perfCopyBtn.addEventListener("click", copyProbeReport);
 
     // ——— Помощь и поддержка ———
-    // Реквизиты поддержки. Пустой список — кнопка «Поддержать проект» не показывается.
-    // Адрес: { label: "USDT", hint: "сеть TRC20", value: "T..." }
-    // Ссылка: { label: "Boosty", hint: "картой", url: "https://boosty.to/..." }
-    const SUPPORT_RAILS = [];
+    // «Поддержать проект» — обычная ссылка в index.html (Boosty), JS ей не нужен.
     setupSupport();
 
     function setupSupport() {
-      const donateRow = document.getElementById("supportDonateRow");
-      const donateBtn = document.getElementById("supportDonateBtn");
-      const railsBox = document.getElementById("supportRails");
-      const thanks = document.getElementById("supportThanks");
       const mailBtn = document.getElementById("mailAuthorBtn");
       if (mailBtn) {
         const version = (window.__BUILD_INFO__ && window.__BUILD_INFO__.version) || "";
@@ -3641,74 +3634,6 @@ const TOAST_ACTION_MS = 6000;
         ].join("\n");
         mailBtn.href = `mailto:vlad-02_2014@mail.ru?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       }
-      if (!donateRow || !donateBtn || !railsBox || !SUPPORT_RAILS.length) return;
-      // Асинхронный доступ к буферу есть не везде: по адресу вида http://192.168.x.x
-      // страница не считается безопасной, и navigator.clipboard отказывает.
-      const copyText = async (text) => {
-        try {
-          if (navigator.clipboard && window.isSecureContext) {
-            await navigator.clipboard.writeText(text);
-            return true;
-          }
-        } catch {}
-        try {
-          const field = document.createElement("textarea");
-          field.value = text;
-          field.setAttribute("readonly", "");
-          field.style.position = "fixed";
-          field.style.top = "-1000px";
-          document.body.append(field);
-          field.select();
-          const ok = document.execCommand("copy");
-          field.remove();
-          return ok;
-        } catch {
-          return false;
-        }
-      };
-      SUPPORT_RAILS.forEach((rail) => {
-        const row = document.createElement("div");
-        row.className = "support-rail";
-        const copy = document.createElement("div");
-        copy.className = "support-rail-copy";
-        const label = document.createElement("span");
-        label.className = "support-rail-label";
-        label.textContent = rail.hint ? `${rail.label} · ${rail.hint}` : rail.label;
-        copy.append(label);
-        if (rail.value) {
-          const value = document.createElement("code");
-          value.textContent = rail.value;
-          copy.append(value);
-        }
-        row.append(copy);
-        if (rail.url) {
-          const link = document.createElement("a");
-          link.className = "pixel-btn settings-btn link-btn support-rail-btn";
-          link.href = rail.url;
-          link.target = "_blank";
-          link.rel = "noopener";
-          link.textContent = "Открыть";
-          row.append(link);
-        } else if (rail.value) {
-          const copyBtn = document.createElement("button");
-          copyBtn.type = "button";
-          copyBtn.className = "pixel-btn settings-btn support-rail-btn";
-          copyBtn.textContent = "Скопировать";
-          copyBtn.addEventListener("click", async () => {
-            const ok = await copyText(rail.value);
-            showToast(ok ? "Адрес скопирован" : "Скопируйте адрес вручную");
-          });
-          row.append(copyBtn);
-        }
-        railsBox.append(row);
-      });
-      donateRow.hidden = false;
-      donateBtn.addEventListener("click", () => {
-        const open = railsBox.hidden;
-        railsBox.hidden = !open;
-        donateBtn.setAttribute("aria-expanded", String(open));
-        if (open && thanks) thanks.hidden = false;
-      });
     }
 
     els.installBtn.addEventListener("click", async () => {

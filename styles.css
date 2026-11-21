@@ -4660,56 +4660,6 @@ html[data-profile="full"] .tool-dialog::backdrop {
   overflow-wrap: anywhere;
 }
 
-.support-rails {
-  display: grid;
-  gap: 6px;
-  margin-top: 9px;
-}
-
-.support-rail {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 6px 7px;
-  background: #fffdf7;
-  border: 2px solid #d8c294;
-}
-
-.support-rail-copy {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.support-rail-label {
-  color: #4a361f;
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.support-rail code {
-  color: #4f3b23;
-  font-family: var(--font-body);
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
-}
-
-.support-rail-btn {
-  flex: 0 0 auto;
-  min-height: 32px;
-  padding: 5px 8px;
-  font-size: 11.5px;
-}
-
-.support-thanks {
-  margin-top: 8px;
-}
-
 .settings-warning {
   margin-top: 7px;
   color: #8b5a2b;
