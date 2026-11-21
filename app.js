@@ -1453,11 +1453,12 @@ const TOAST_ACTION_MS = 6000;
 
   // Кнопка года не привязана к 2027: 1 января 2028 она должна вести в новый год,
   // а не в прошлое. Подпись и aria-label строятся из текущего года в renderPeriod.
-  // Знак в шапке: разметка из sign.js, день ставится по календарю устройства.
+  // Знак в шапке: основа из sign.js стоит в разметке, здесь только число текущего дня.
+  // Временно в шапке может стоять прежний блок травы — тогда группы числа нет и мы ничего не делаем.
   function renderBrandSign() {
-    const host = document.querySelector(".logo-block");
-    if (!host || !window.PixelSign) return;
-    host.innerHTML = window.PixelSign.useMarkup(new Date().getDate());
+    const group = document.getElementById("brandDayNumber");
+    if (!group || !window.PixelSign) return;
+    group.innerHTML = window.PixelSign.numberMarkup(new Date().getDate());
   }
 
   function goToCurrentYear() {

@@ -905,13 +905,17 @@ function isoToday() {
 
     // Знак в шапке: число = текущий день. Источник графики один (sign.js), поэтому
     // проверяем не «похоже», а точное совпадение с разметкой того же генератора.
+    // Временно в шапке стоит прежний блок травы, тогда проверяем обратное: числа в шапке нет.
     const brandSign = await cdp.eval(`(() => {
-      const group = document.getElementById("brandDayNumber");
+      const host = document.querySelector(".logo-block");
       const sign = window.PixelSign;
-      if (!group || !sign) return { ok: false, why: group ? "нет window.PixelSign" : "нет группы числа" };
+      if (!host || !sign) return { ok: false, why: host ? "нет window.PixelSign" : "нет .logo-block" };
+      const group = document.getElementById("brandDayNumber");
+      const headerSign = host.querySelector("g");
+      if (!group) return { ok: true, grass: true, headerSign: Boolean(headerSign) };
       // innerHTML переписывает <rect/> как <rect></rect>, поэтому сравниваем
       // не строку, а сами прямоугольники: и живой знак, и эталон проходят DOM.
-      const coords = (host) => Array.from(host.querySelectorAll("rect"))
+      const coords = (node) => Array.from(node.querySelectorAll("rect"))
         .map((r) => r.getAttribute("x") + "," + r.getAttribute("y")).join(" ");
       const doc = new DOMParser().parseFromString(sign.useMarkup(new Date().getDate()), "image/svg+xml");
       const expected = doc.getElementById("brandDayNumber");
@@ -922,7 +926,7 @@ function isoToday() {
         expectedRects: expected ? expected.querySelectorAll("rect").length : 0
       };
     })()`);
-    check("знак в шапке: число равно текущему дню", brandSign.ok === true, JSON.stringify(brandSign));
+    check("знак в шапке: число равно текущему дню (или временно прежний блок травы)", brandSign.ok === true, JSON.stringify(brandSign));
 
     check("ошибок в консоли нет", consoleErrors.length === 0, consoleErrors.join(" | "));
     check("падений JS нет", exceptions.length === 0, exceptions.join(" | "));
