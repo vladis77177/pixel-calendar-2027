@@ -117,17 +117,19 @@ check(
     || /android:exported="false"[^>]*android:name="\.WidgetToggleReceiver"/s.test(manifest),
   "WidgetToggleReceiver must be declared with exported=\"false\""
 );
+const expectedToggleAction = `${PACKAGE}.WIDGET_TOGGLE`;
+const manifestToggleActions = manifest.match(/<action android:name="[^"]*\.WIDGET_TOGGLE"/g) || [];
 check(
-  manifest.includes("ru.pixel.calendar2027.WIDGET_TOGGLE"),
-  "WidgetToggleReceiver intent-filter action is missing"
+  manifestToggleActions.length === 1 && manifestToggleActions[0] === `<action android:name="${expectedToggleAction}"`,
+  `WidgetToggleReceiver intent-filter action must be ${expectedToggleAction} (appId from capacitor.config.json), found ${manifestToggleActions.join(", ") || "nothing"}`
 );
 check(
-  manifest.includes("android:name=\"ru.pixel.calendar2027.WIDGET_TOGGLE\""),
-  "WidgetToggleReceiver action must match ru.pixel.calendar2027.WIDGET_TOGGLE"
+  /getPackageName\(\)\s*\+\s*"\.WIDGET_TOGGLE"/.test(receiver),
+  `WidgetToggleReceiver must build its action as getPackageName() + ".WIDGET_TOGGLE" so it equals ${expectedToggleAction}`
 );
 check(
-  receiver.includes("ru.pixel.calendar2027.WIDGET_TOGGLE"),
-  "WidgetToggleReceiver must handle action ru.pixel.calendar2027.WIDGET_TOGGLE"
+  !/"[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+\.WIDGET_TOGGLE"/.test(receiver),
+  `WidgetToggleReceiver must not hardcode the action: it has to stay ${expectedToggleAction} when appId changes`
 );
 check(
   !receiver.includes("MainActivity") && !receiver.includes("startActivity"),

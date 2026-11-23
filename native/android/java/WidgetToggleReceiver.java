@@ -9,14 +9,17 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class WidgetToggleReceiver extends BroadcastReceiver {
-    static final String ACTION_TOGGLE = "ru.pixel.calendar2027.WIDGET_TOGGLE";
     static final String EXTRA_KEY = "key";
     static final String EXTRA_ISO = "iso";
     private static final String KEY_PENDING = "pending_toggles";
 
+    static String action(Context context) {
+        return context.getPackageName() + ".WIDGET_TOGGLE";
+    }
+
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (intent == null || !ACTION_TOGGLE.equals(intent.getAction())) return;
+        if (intent == null || !action(context).equals(intent.getAction())) return;
         String key = intent.getStringExtra(EXTRA_KEY);
         if (key == null || !key.startsWith("task:")) return;
         String iso = intent.getStringExtra(EXTRA_ISO);

@@ -128,7 +128,7 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
             String key = task.optString("key", "");
             if (key.startsWith("task:")) {
                 Intent toggleIntent = new Intent(context, WidgetToggleReceiver.class);
-                toggleIntent.setAction(WidgetToggleReceiver.ACTION_TOGGLE);
+                toggleIntent.setAction(WidgetToggleReceiver.action(context));
                 toggleIntent.putExtra(WidgetToggleReceiver.EXTRA_KEY, key);
                 toggleIntent.putExtra(WidgetToggleReceiver.EXTRA_ISO, iso);
                 PendingIntent togglePending = PendingIntent.getBroadcast(

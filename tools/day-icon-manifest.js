@@ -6,7 +6,11 @@
 // разметку можно было просмотреть и проверить без прогона всего генератора.
 // Usage: node tools/day-icon-manifest.js [--check]
 
-const PACKAGE = "ru.pixel.calendar2027";
+const fs = require("fs");
+const path = require("path");
+
+const CONFIG = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "capacitor.config.json"), "utf8"));
+const PACKAGE = CONFIG.appId;
 const ACTIVITY = ".MainActivity";
 
 function aliasXml(day) {

@@ -1134,24 +1134,6 @@ html[data-holiday="on"] .island-grass {
     4px 4px 0 rgba(58, 41, 27, 0.18);
 }
 
-.brand-year {
-  position: relative;
-  display: inline-block;
-  margin-left: 4px;
-  padding: 2px 9px 3px;
-  background: var(--gold);
-  border: 3px solid var(--line);
-  box-shadow: 4px 4px 0 var(--line);
-  transform: rotate(-1.5deg);
-  font-size: 0.78em;
-  line-height: 1;
-  color: #4a3013;
-  /* Год в логотипе — тоже цифры: Tiny5 на мелком кегле читается как «8087». */
-  font-family: var(--font-num);
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-
 .today-chip {
   display: flex;
   align-items: center;
@@ -3349,7 +3331,7 @@ html[data-daytime="night"] .update-badge-warn {
   }
 
   .brand-title {
-    font-size: clamp(27px, 6.7vw, 38px);
+    font-size: clamp(26px, 4.2vw, 33px);
   }
 
   .brand-eyebrow {
@@ -5007,14 +4989,8 @@ html[data-profile="full"] .tool-dialog::backdrop {
   }
 
   .brand-title {
-    font-size: clamp(25px, 7.6vw, 32px);
+    font-size: clamp(20px, 5.6vw, 30px);
     text-shadow: 1px 1px 0 #fff8e7;
-  }
-
-  .brand-year {
-    padding: 2px 6px;
-    border-width: 2px;
-    box-shadow: 3px 3px 0 var(--line);
   }
 
   .today-chip {
@@ -5165,7 +5141,7 @@ html[data-profile="full"] .tool-dialog::backdrop {
 
 @media (max-width: 390px) {
   .brand-title {
-    font-size: 24px;
+    font-size: clamp(19px, 5.6vw, 22px);
   }
 
   .brand-eyebrow {

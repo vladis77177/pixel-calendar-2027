@@ -331,11 +331,16 @@ if (!manifest.includes(".WidgetToggleReceiver")) {
             android:name=".WidgetToggleReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="ru.pixel.calendar2027.WIDGET_TOGGLE" />
+                <action android:name="${PACKAGE}.WIDGET_TOGGLE" />
             </intent-filter>
         </receiver>
 `;
   manifest = manifest.replace("</application>", `${toggleReceiver}    </application>`);
+} else {
+  manifest = manifest.replace(
+    /(android:name="\.WidgetToggleReceiver"[\s\S]*?<action android:name=")[^"]*\.WIDGET_TOGGLE(")/,
+    `$1${PACKAGE}.WIDGET_TOGGLE$2`
+  );
 }
 
 // Живой значок ярлыка: смена дня переключает activity-alias, как виджет узнаёт о дате.
