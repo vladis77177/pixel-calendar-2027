@@ -928,6 +928,21 @@ function isoToday() {
     })()`);
     check("знак в шапке: число равно текущему дню (или временно прежний блок травы)", brandSign.ok === true, JSON.stringify(brandSign));
 
+    // Подпись внизу — фраза дня из core.js: сверяем текст на странице с тем же
+    // расчётом, а не с жёстко записанной фразой.
+    const footerPhrase = await cdp.eval(`(() => {
+      const node = document.getElementById("footerPhrase");
+      if (!node) return { ok: false, why: "нет #footerPhrase" };
+      const core = window.PixelCore;
+      if (!core) return { ok: false, why: "нет window.PixelCore" };
+      const now = new Date();
+      const iso = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
+      const expected = core.phraseForDay(iso);
+      const text = node.textContent.trim();
+      return { ok: text === expected, text, expected };
+    })()`);
+    check("подпись внизу: фраза дня совпадает с core.js", footerPhrase.ok === true, JSON.stringify(footerPhrase));
+
     check("ошибок в консоли нет", consoleErrors.length === 0, consoleErrors.join(" | "));
     check("падений JS нет", exceptions.length === 0, exceptions.join(" | "));
   } catch (error) {

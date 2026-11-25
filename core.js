@@ -255,6 +255,24 @@
     return "night";
   }
 
+  // Фразы внизу страницы: одна на день, меняется в полночь. Список короткий и
+  // задан владельцем, поэтому подпись — данные, а не генератор.
+  const FOOTER_PHRASES = [
+    "Один добрый поступок вдохновляет на новые",
+    "Порядок в делах — тишина в голове"
+  ];
+
+  // Номер дня из ISO без часового пояса: соседние даты дают соседние индексы,
+  // поэтому фразы чередуются, а в течение дня выбор не меняется.
+  function phraseForDay(iso) {
+    const parts = String(iso || "").split("-").map(Number);
+    if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) {
+      return FOOTER_PHRASES[0];
+    }
+    const index = (parts[0] * 372 + parts[1] * 31 + parts[2]) % FOOTER_PHRASES.length;
+    return FOOTER_PHRASES[index];
+  }
+
   root.PixelCore = {
     toISO,
     fromISO,
@@ -266,6 +284,8 @@
     isSeriesActiveOn,
     skyPhaseFor,
     parseQuickInput,
+    phraseForDay,
+    FOOTER_PHRASES,
     SKY_PHASES
   };
   if (typeof module !== "undefined" && module.exports) module.exports = root.PixelCore;

@@ -224,3 +224,14 @@ test("skyPhaseFor: фиксированная тема сильнее време
   assert.equal(core.skyPhaseFor(12, "мусор"), "day");
   assert.equal(core.skyPhaseFor(NaN, "auto"), "day");
 });
+
+test("phraseForDay: фраза постоянна в течение дня и меняется в полночь", () => {
+  const phrases = core.FOOTER_PHRASES;
+  assert.ok(phrases.length >= 2);
+  assert.equal(core.phraseForDay("2027-05-04"), core.phraseForDay("2027-05-04"));
+  assert.ok(phrases.includes(core.phraseForDay("2027-05-04")));
+  assert.notEqual(core.phraseForDay("2027-05-04"), core.phraseForDay("2027-05-05"));
+  // Мусор не должен оставлять подпись пустой.
+  assert.equal(core.phraseForDay(""), phrases[0]);
+  assert.equal(core.phraseForDay(null), phrases[0]);
+});

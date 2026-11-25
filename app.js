@@ -188,6 +188,7 @@
     seriesStats: document.getElementById("seriesStats"),
     templatesInput: document.getElementById("templatesInput"),
     saveNoteText: document.getElementById("saveNoteText"),
+    footerPhrase: document.getElementById("footerPhrase"),
     syncUrl: document.getElementById("syncUrl"),
     syncToken: document.getElementById("syncToken"),
     syncConnectBtn: document.getElementById("syncConnectBtn"),
@@ -1459,6 +1460,14 @@ const TOAST_ACTION_MS = 6000;
     const group = document.getElementById("brandDayNumber");
     if (!group || !window.PixelSign) return;
     group.innerHTML = window.PixelSign.numberMarkup(new Date().getDate());
+  }
+
+  // Подпись внизу — фраза дня: считается от той же даты, что и число на значке,
+  // и меняется в полночь вместе с ней.
+  function updateFooterPhrase() {
+    if (!els.footerPhrase || !window.PixelCore) return;
+    const text = window.PixelCore.phraseForDay(toISO(startOfDay(new Date())));
+    if (els.footerPhrase.textContent !== text) els.footerPhrase.textContent = text;
   }
 
   function goToCurrentYear() {
@@ -2891,6 +2900,7 @@ const TOAST_ACTION_MS = 6000;
     const selectedWasToday = state.selectedDate === knownToday;
     const cursorWasToday = isSameDay(state.cursor, oldToday);
     knownToday = current;
+    updateFooterPhrase();
     if (selectedWasToday) state.selectedDate = current;
     if (cursorWasToday) state.cursor = fromISO(current);
     updateTodayLabel();
@@ -4329,9 +4339,13 @@ const TOAST_ACTION_MS = 6000;
     setupWidgetToggles();
     setupAndroidBack();
     renderBrandSign();
+    updateFooterPhrase();
     // День меняется и при открытом приложении: возвращаемся к экрану — знак догоняет дату.
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") renderBrandSign();
+      if (document.visibilityState === "visible") {
+        renderBrandSign();
+        updateFooterPhrase();
+      }
     });
     renderAll(true);
     setupSnowman();
