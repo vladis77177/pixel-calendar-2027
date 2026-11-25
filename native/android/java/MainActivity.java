@@ -18,6 +18,7 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         captureQuickAdd(getIntent());
         DayIconSwitcher.apply(this);
+        DayIconSwitcher.scheduleNext(this);
         registerPlugin(WidgetBridgePlugin.class);
         super.onCreate(savedInstanceState);
         WebView webView = bridgeWebView();

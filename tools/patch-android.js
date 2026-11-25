@@ -344,8 +344,10 @@ if (!manifest.includes(".WidgetToggleReceiver")) {
 }
 
 // Живой значок ярлыка: смена дня переключает activity-alias, как виджет узнаёт о дате.
-if (!manifest.includes(".DayIconReceiver")) {
-  const dayReceiver = `
+// DATE_CHANGED до Android 8; с 8 его манифесту не шлют, поэтому основной тик —
+// собственный будильник (DayIconSwitcher.scheduleNext), а MY_PACKAGE_REPLACED
+// взводит его заново после установки новой версии.
+const dayReceiver = `
         <receiver
             android:name=".DayIconReceiver"
             android:exported="false">
@@ -354,9 +356,16 @@ if (!manifest.includes(".DayIconReceiver")) {
                 <action android:name="android.intent.action.TIME_SET" />
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 `;
+if (manifest.includes(".DayIconReceiver")) {
+  manifest = manifest.replace(
+    /<receiver\s+android:name="\.DayIconReceiver"[\s\S]*?<\/receiver>/,
+    dayReceiver.trim()
+  );
+} else {
   manifest = manifest.replace("</application>", `${dayReceiver}    </application>`);
 }
 

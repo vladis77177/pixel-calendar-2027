@@ -22,6 +22,8 @@ public class CalendarWidgetProvider extends AppWidgetProvider {
 
     @Override
     public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
+        // Виджет система будит каждые 30 минут — заодно повод догнать дату на значке.
+        DayIconSwitcher.apply(context);
         for (int id : ids) {
             updateWidget(context, manager, id);
         }

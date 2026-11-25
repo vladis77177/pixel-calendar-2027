@@ -309,6 +309,23 @@ check(
   mainActivity.includes("DayIconSwitcher.apply"),
   "MainActivity.onCreate должен вызывать DayIconSwitcher.apply(this), иначе значок не догонит дату при запуске"
 );
+// DATE_CHANGED манифесту с Android 8 не приходит, поэтому смену дня держит будильник.
+check(
+  dayIconSwitcher.includes("setAndAllowWhileIdle") && dayIconSwitcher.includes("scheduleNext"),
+  "DayIconSwitcher должен взводить ежедневный будильник (setAndAllowWhileIdle) — иначе значок ждёт запуска"
+);
+check(
+  dayIconReceiver.includes("tickAction") && dayIconReceiver.includes("scheduleNext"),
+  "DayIconReceiver должен обрабатывать тик будильника и взводить следующий"
+);
+check(
+  mainActivity.includes("DayIconSwitcher.scheduleNext"),
+  "MainActivity.onCreate должен взводить следующий тик значка"
+);
+check(
+  manifest.includes("android.intent.action.MY_PACKAGE_REPLACED"),
+  "DayIconReceiver не слушает MY_PACKAGE_REPLACED — после обновления APK будильник не взведётся"
+);
 
 // Ярлык запуска должен принадлежать ровно одному компоненту: у самой MainActivity
 // его быть не должно, иначе в лончере два значка — живой и статичный.
