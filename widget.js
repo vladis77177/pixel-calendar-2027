@@ -1,7 +1,8 @@
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "pixel-calendar-2027-v1";
+  const STORAGE_KEY = "cachepixel-v1";
+  const LEGACY_STORAGE_KEY = "pixel-calendar-2027-v1";
   const WEEKDAYS_FULL = [
     "воскресенье", "понедельник", "вторник", "среда",
     "четверг", "пятница", "суббота"
@@ -78,7 +79,9 @@
 
   function loadRaw() {
     try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+      // app.js переезжает на новый ключ при старте; до этого читаем старый.
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return JSON.parse((raw !== null ? raw : localStorage.getItem(LEGACY_STORAGE_KEY)) || "null");
     } catch (error) {
       return null;
     }
@@ -283,7 +286,7 @@
     els.clock.textContent = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
     els.holiday.hidden = !holiday;
     els.holiday.textContent = holiday ? `★ ${holiday}` : "";
-    document.title = `Сегодня, ${date.getDate()} ${MONTHS_GENITIVE[date.getMonth()]} · Пиксельный календарь`;
+    document.title = `Сегодня, ${date.getDate()} ${MONTHS_GENITIVE[date.getMonth()]} · CachePixel`;
   }
 
   function renderTasks() {

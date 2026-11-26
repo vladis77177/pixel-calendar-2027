@@ -265,7 +265,7 @@ test("сервер синхронизации", async (t) => {
     if (fs.existsSync(path.join(ROOT, "www", "index.html"))) {
       assert.equal(response.status, 200);
       const html = await response.text();
-      assert.ok(html.includes("Пиксельный календарь"));
+      assert.ok(html.includes("CachePixel"));
     } else {
       assert.equal(response.status, 404);
     }
@@ -419,7 +419,7 @@ test("по умолчанию данные сервера живут вне па
   });
   await waitForServer(child);
 
-  const expected = path.join(appData, "pixel-calendar-2027-sync");
+  const expected = path.join(appData, "cachepixel-sync");
   assert.ok(
     fs.existsSync(path.join(expected, "token.txt")),
     `код подключения должен лежать в ${expected}, а не в папке проекта`
@@ -433,4 +433,55 @@ test("по умолчанию данные сервера живут вне па
   });
   assert.equal(response.status, 200);
   assert.ok(fs.existsSync(path.join(expected, "state.json")), "состояние тоже пишется вне проекта");
+});
+
+// Владелец переименовал папку данных: прежние дела и код подключения должны
+// переехать сами, иначе синхронизация «теряется» после обновления.
+test("сервер переносит данные из папки прежнего бренда", async (t) => {
+  const appData = fs.mkdtempSync(path.join(os.tmpdir(), "pixel-appdata-"));
+  const legacy = path.join(appData, "pixel-calendar-2027-sync");
+  fs.mkdirSync(legacy, { recursive: true });
+  const state = JSON.stringify({
+    version: 4,
+    updatedAt: Date.now(),
+    tasks: { "2026-11-10": [{ id: "legacy-1", text: "Дело из прежней папки", done: false, updatedAt: Date.now() }] },
+    series: [],
+    settings: {}
+  });
+  fs.writeFileSync(path.join(legacy, "state.json"), state, "utf8");
+  fs.writeFileSync(path.join(legacy, "token.txt"), `${"c".repeat(32)}\n`, "utf8");
+
+  const port = await freePort();
+  const child = spawn(process.execPath, [path.join(ROOT, "sync-server", "server.js")], {
+    env: {
+      ...process.env,
+      PORT: String(port),
+      HOST: "127.0.0.1",
+      LOCALAPPDATA: appData,
+      XDG_DATA_HOME: appData
+    },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+  t.after(() => {
+    child.kill();
+    fs.rmSync(appData, { recursive: true, force: true });
+  });
+  await waitForServer(child);
+
+  const next = path.join(appData, "cachepixel-sync");
+  assert.equal(
+    fs.readFileSync(path.join(next, "token.txt"), "utf8").trim(),
+    "c".repeat(32),
+    "код подключения переехал"
+  );
+  const response = await fetch(`http://127.0.0.1:${port}/api/state`, {
+    headers: { "X-Sync-Token": "c".repeat(32) }
+  });
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.ok(
+    payload.tasks["2026-11-10"].some((task) => task.text === "Дело из прежней папки"),
+    "дела переехали"
+  );
+  assert.ok(fs.existsSync(path.join(legacy, "state.json")), "прежняя папка осталась на месте");
 });

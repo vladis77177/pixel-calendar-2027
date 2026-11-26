@@ -79,7 +79,7 @@ public class WidgetBridgePlugin extends Plugin {
 
     @PluginMethod
     public void saveBackup(PluginCall call) {
-        String filename = call.getString("filename", "pixel-calendar-2027-backup.json");
+        String filename = call.getString("filename", "cachepixel-backup.json");
         String content = call.getString("content", "");
 
         try {

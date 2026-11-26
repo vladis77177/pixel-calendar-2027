@@ -353,7 +353,8 @@
   }
 
   // ── Синхронизация по локальной сети ─────────────────────────────────────
-  const SYNC_KEY = "pixel-calendar-2027-sync";
+  const SYNC_KEY = "cachepixel-sync";
+  const LEGACY_SYNC_KEY = "pixel-calendar-2027-sync";
   const SYNC_DEFAULTS = { url: "", token: "", lastSyncAt: 0, lastOkAt: 0, lastError: null };
   const SYNC_TIMEOUT = 8000;
   const SKEW_WARNING = 2 * 60 * 1000;
@@ -370,7 +371,13 @@
   function readSyncConfig() {
     if (typeof localStorage === "undefined") return { ...SYNC_DEFAULTS };
     try {
-      const saved = JSON.parse(localStorage.getItem(SYNC_KEY) || "{}");
+      let raw = localStorage.getItem(SYNC_KEY);
+      if (raw === null) {
+        // Код подключения прежнего бренда переезжает на новый ключ сразу при чтении.
+        raw = localStorage.getItem(LEGACY_SYNC_KEY);
+        if (raw !== null) localStorage.setItem(SYNC_KEY, raw);
+      }
+      const saved = JSON.parse(raw || "{}");
       return { ...SYNC_DEFAULTS, ...(saved && typeof saved === "object" ? saved : {}) };
     } catch (error) {
       return { ...SYNC_DEFAULTS };

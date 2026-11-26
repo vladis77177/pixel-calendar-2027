@@ -496,7 +496,7 @@ if (fs.existsSync(stringsFile)) {
     strings = strings.replace(
       "</resources>",
       '    <string name="widget_label">Календарь на сегодня</string>\n'
-      + '    <string name="widget_description">План на сегодня из Пиксельного календаря</string>\n'
+      + '    <string name="widget_description">План на сегодня из CachePixel</string>\n'
       + "</resources>"
     );
     stringsChanged = true;

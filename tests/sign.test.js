@@ -1,4 +1,4 @@
-// Знак «Пиксельного календаря»: один источник графики для шапки, favicon и иконок APK.
+// Знак CachePixel: один источник графики для шапки, favicon и иконок APK.
 const test = require("node:test");
 const assert = require("node:assert");
 const path = require("node:path");

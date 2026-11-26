@@ -2,11 +2,18 @@
 // Без него первый кадр всегда дневной (#82d4fb), а затем CSS плавно (1.2 с)
 // переходит в вечернюю или ночную тему — это и видно как «белая вспышка».
 (function (root) {
-  const SETTINGS_KEY = "pixel-calendar-2027-v1";
+  const SETTINGS_KEY = "cachepixel-v1";
+  const LEGACY_SETTINGS_KEY = "pixel-calendar-2027-v1";
+
+  function readSettingsRaw() {
+    const raw = root.localStorage.getItem(SETTINGS_KEY);
+    // app.js переезжает на новый ключ при старте; до этого читаем старый.
+    return raw !== null ? raw : root.localStorage.getItem(LEGACY_SETTINGS_KEY);
+  }
 
   function storedSky() {
     try {
-      const raw = root.localStorage.getItem(SETTINGS_KEY);
+      const raw = readSettingsRaw();
       if (!raw) return "auto";
       const parsed = JSON.parse(raw);
       const sky = parsed && parsed.settings && parsed.settings.sky;

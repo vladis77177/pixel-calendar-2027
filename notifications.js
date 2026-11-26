@@ -422,7 +422,7 @@
         notifications: [...wanted.entries()].map(([id, item]) => {
           const base = {
             id,
-            title: item.title || "Пиксельный календарь",
+            title: item.title || "CachePixel",
             body: item.text,
             smallIcon: "ic_stat_calendar",
             iconColor: "#5FB947",

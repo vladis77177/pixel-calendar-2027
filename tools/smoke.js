@@ -10,7 +10,10 @@ const path = require("path");
 
 const ROOT = path.join(__dirname, "..");
 const WWW = path.join(ROOT, "www");
-const STORE_KEY = "pixel-calendar-2027-v1";
+const STORE_KEY = "cachepixel-v1";
+const BACKUP_KEY = "cachepixel-backup";
+// Ключ прежнего бренда: его данные должны сами переехать на новый ключ.
+const LEGACY_STORE_KEY = "pixel-calendar-2027-v1";
 
 const results = [];
 let crashed = false;
@@ -231,6 +234,31 @@ function isoToday() {
       (await cdp.eval(`${readStore} === null || Object.keys((${readStore})?.tasks || {}).length === 0`))
     );
 
+    // 0b. Переезд ключей: данные прежнего бренда читаются и переезжают на новый ключ.
+    await cdp.eval(`(() => {
+      localStorage.clear();
+      localStorage.setItem(${JSON.stringify(LEGACY_STORE_KEY)}, JSON.stringify({
+        version: 4,
+        view: "month",
+        tasks: { ${JSON.stringify(today)}: [{ id: "legacy-1", text: "Смоук: дело из старого ключа", done: false, updatedAt: Date.now() }] },
+        series: [],
+        settings: {}
+      }));
+      return true;
+    })()`);
+    await cdp.eval(`location.reload(); true`);
+    await cdp.waitFor(`!!document.querySelector("#calendarView")`, "календарь перечитал старый ключ");
+    check("переезд ключей: дело со старого ключа видно", await cdp.eval(
+      `(${readStore})?.tasks?.[${JSON.stringify(today)}]?.some((task) => task.text === "Смоук: дело из старого ключа") === true`
+    ));
+    check("переезд ключей: данные скопированы на новый ключ, старый остался", await cdp.eval(
+      `localStorage.getItem(${JSON.stringify(STORE_KEY)}) !== null && localStorage.getItem(${JSON.stringify(LEGACY_STORE_KEY)}) !== null`
+    ));
+    // Дальше снова чистая установка, чтобы переезд не влиял на остальные сценарии.
+    await cdp.eval(`localStorage.clear(); sessionStorage.clear(); true`);
+    await cdp.send("Page.navigate", { url: `http://127.0.0.1:${serverPort}/index.html` });
+    await cdp.waitFor(`document.querySelectorAll(".day-cell").length >= 28`, "сетка месяца после переезда");
+
     // 1. Быстрое дело через строку сверху.
     await cdp.eval(`(() => {
       const input = document.querySelector("#quickAddInput");
@@ -252,7 +280,7 @@ function isoToday() {
     ));
 
     // Снимок рабочего хранилища пригодится в проверке восстановления после порчи.
-    const goodStore = await cdp.eval(`localStorage.getItem("pixel-calendar-2027-v1")`);
+    const goodStore = await cdp.eval(`localStorage.getItem(${JSON.stringify(STORE_KEY)})`);
 
     // 2. Окно дня: дело со временем напоминания.
     await cdp.eval(`document.querySelector('.day-cell[data-date="${today}"]').click(); true`);
@@ -453,8 +481,8 @@ function isoToday() {
     // 9. Битое хранилище: предыдущий снимок предлагается и восстанавливается.
     check("битый сторадж: снимок хранилища снят", typeof goodStore === "string" && goodStore.length > 20, String(goodStore).slice(0, 60));
     await cdp.eval(`(() => {
-      localStorage.setItem("pixel-calendar-2027-backup", JSON.stringify({ at: Date.now(), raw: ${JSON.stringify(goodStore)} }));
-      localStorage.setItem("pixel-calendar-2027-v1", '{"tasks":[,');
+      localStorage.setItem("cachepixel-backup", JSON.stringify({ at: Date.now(), raw: ${JSON.stringify(goodStore)} }));
+      localStorage.setItem(${JSON.stringify(STORE_KEY)}, '{"tasks":[,');
       return true;
     })()`);
     await cdp.eval(`location.reload(); true`);
@@ -476,14 +504,14 @@ function isoToday() {
       `(${readStore})?.tasks?.[${JSON.stringify(today)}]?.some((task) => task.text === "Смоук: полить цветы") === true`
     ));
     check("битый сторадж: копии остаются после восстановления", await cdp.eval(
-      `localStorage.getItem("pixel-calendar-2027-corrupt") !== null && localStorage.getItem("pixel-calendar-2027-backup") !== null`
+      `localStorage.getItem("cachepixel-corrupt") !== null && localStorage.getItem("cachepixel-backup") !== null`
     ));
     check("битый сторадж: есть кнопки «Скачать копию» и «Убрать копии»", await cdp.eval(
       `Boolean(document.querySelector("#recoverDownload")) && Boolean(document.querySelector("#recoverDrop"))`
     ));
     await cdp.eval(`document.querySelector("#recoverDrop").click(); true`);
     check("битый сторадж: «Убрать копии» чистит хранилище", await cdp.eval(
-      `localStorage.getItem("pixel-calendar-2027-corrupt") === null && localStorage.getItem("pixel-calendar-2027-backup") === null`
+      `localStorage.getItem("cachepixel-corrupt") === null && localStorage.getItem("cachepixel-backup") === null`
     ));
 
     // 10. Поиск работает и не падает на серии: ввод с задержкой, потом результаты.
@@ -856,7 +884,7 @@ function isoToday() {
       const input = document.getElementById("taskInput");
       input.value = "Проверка гонки close";
       document.getElementById("taskForm").requestSubmit();
-      const store = JSON.parse(localStorage.getItem("pixel-calendar-2027-v1") || "{}");
+      const store = JSON.parse(localStorage.getItem("cachepixel-v1") || "{}");
       const tasks = (store.tasks || {})["${tomorrow}"] || [];
       return tasks.some((task) => task.text === "Проверка гонки close");
     })()`);
@@ -903,30 +931,22 @@ function isoToday() {
     })()`);
     check("обновления: в браузере выключателя нет (и запроса тоже)", updateRow.exists && updateRow.hidden === true, JSON.stringify(updateRow));
 
-    // Знак в шапке: число = текущий день. Источник графики один (sign.js), поэтому
-    // проверяем не «похоже», а точное совпадение с разметкой того же генератора.
-    // Временно в шапке стоит прежний блок травы, тогда проверяем обратное: числа в шапке нет.
+    // Знак в шапке — постоянный логотип бренда без числа, поэтому сверяем его
+    // с разметкой того же генератора (build-sign.js), а не с «похоже выглядит».
     const brandSign = await cdp.eval(`(() => {
       const host = document.querySelector(".logo-block");
-      const sign = window.PixelSign;
-      if (!host || !sign) return { ok: false, why: host ? "нет window.PixelSign" : "нет .logo-block" };
-      const group = document.getElementById("brandDayNumber");
-      const headerSign = host.querySelector("g");
-      if (!group) return { ok: true, grass: true, headerSign: Boolean(headerSign) };
-      // innerHTML переписывает <rect/> как <rect></rect>, поэтому сравниваем
-      // не строку, а сами прямоугольники: и живой знак, и эталон проходят DOM.
-      const coords = (node) => Array.from(node.querySelectorAll("rect"))
-        .map((r) => r.getAttribute("x") + "," + r.getAttribute("y")).join(" ");
-      const doc = new DOMParser().parseFromString(sign.useMarkup(new Date().getDate()), "image/svg+xml");
-      const expected = doc.getElementById("brandDayNumber");
+      if (!host) return { ok: false, why: "нет .logo-block" };
+      const svg = host.querySelector("svg");
+      if (!svg) return { ok: false, why: "нет svg в шапке" };
+      if (svg.querySelector("g")) return { ok: false, why: "в логотипе шапки появилась группа числа" };
+      const rects = Array.from(svg.querySelectorAll("rect"));
       return {
-        ok: Boolean(expected) && coords(group) === coords(expected),
-        day: new Date().getDate(),
-        rects: group.querySelectorAll("rect").length,
-        expectedRects: expected ? expected.querySelectorAll("rect").length : 0
+        ok: rects.length > 15,
+        rects: rects.length,
+        viewBox: svg.getAttribute("viewBox")
       };
     })()`);
-    check("знак в шапке: число равно текущему дню (или временно прежний блок травы)", brandSign.ok === true, JSON.stringify(brandSign));
+    check("знак в шапке: постоянный логотип без числа", brandSign.ok === true && brandSign.viewBox === "0 0 16 16", JSON.stringify(brandSign));
 
     // Подпись внизу — фраза дня из core.js: сверяем текст на странице с тем же
     // расчётом, а не с жёстко записанной фразой.

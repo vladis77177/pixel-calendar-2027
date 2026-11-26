@@ -1,7 +1,8 @@
-// Вставляет знак «Пиксельного календаря» из sign.js в статику: favicon.svg и
+// Вставляет в статику логотип шапки и знак CachePixel из sign.js: favicon.svg и
 // разметку логотипа в index.html между маркерами SIGN_LOGO_START/END.
 // Usage: node tools/build-sign.js [--check]
-// Разметку и цифры держит sign.js, поэтому favicon, шапка и значок APK не разъезжаются.
+// В шапке — постоянный знак бренда (без даты). Дата живёт в знаке-иконке:
+// favicon и значок APK рисует sign.js, поэтому они не разъезжаются.
 const fs = require("fs");
 const path = require("path");
 const PixelSign = require(path.join(__dirname, "..", "sign.js"));
@@ -10,34 +11,35 @@ const ROOT = path.join(__dirname, "..");
 const START = "<!-- SIGN_LOGO_START -->";
 const END = "<!-- SIGN_LOGO_END -->";
 
-// ВРЕМЕННО: в шапке стоит прежний блок травы, знак «грядка с календарём» владелец
-// решил перерисовать и вернуть позже. Знак при этом остаётся в favicon и значке APK.
-// Чтобы вернуть знак в шапку — поставьте HEADER_SIGN=true и запустите
-// `node tools/build-sign.js`.
-const HEADER_SIGN = false;
-
-// Прежний блок травы: 11 прямоугольников, без числа (число есть только у знака).
-const GRASS_RECTS = [
-  '<rect width="16" height="16" fill="#3a2718"/>',
-  '<rect x="1" y="1" width="14" height="14" fill="#80522e"/>',
-  '<rect x="1" y="1" width="14" height="5" fill="#5fb947"/>',
-  '<rect x="1" y="1" width="14" height="2" fill="#8ee06e"/>',
-  '<rect x="2" y="6" width="3" height="2" fill="#539f3d"/>',
-  '<rect x="6" y="6" width="2" height="2" fill="#72ca55"/>',
-  '<rect x="11" y="6" width="3" height="2" fill="#539f3d"/>',
-  '<rect x="3" y="9" width="2" height="2" fill="#694021"/>',
-  '<rect x="8" y="10" width="3" height="2" fill="#956237"/>',
-  '<rect x="12" y="12" width="2" height="2" fill="#694021"/>',
-  '<rect x="2" y="12" width="2" height="2" fill="#9a6639"/>',
-  '<rect x="13" y="3" width="1" height="1" fill="#fff1a8"/>'
+// Знак шапки, вариант B: страница календаря с травяной полосой сверху и закладкой.
+// Он статичный — число дня в шапке не показываем.
+const HEADER_RECTS = [
+  '<rect x="5" y="0" width="1" height="1" fill="#6ec44c"/>',
+  '<rect x="6" y="0" width="1" height="1" fill="#8ee06e"/>',
+  '<rect x="9" y="0" width="1" height="1" fill="#6ec44c"/>',
+  '<rect x="11" y="0" width="1" height="1" fill="#5fb947"/>',
+  '<rect x="3" y="1" width="10" height="2" fill="#5fb947"/>',
+  '<rect x="4" y="1" width="7" height="1" fill="#8ee06e"/>',
+  '<rect x="3" y="2" width="10" height="1" fill="#342416"/>',
+  '<rect x="3" y="3" width="1" height="11" fill="#342416"/>',
+  '<rect x="12" y="3" width="1" height="11" fill="#342416"/>',
+  '<rect x="3" y="14" width="8" height="1" fill="#342416"/>',
+  '<rect x="4" y="3" width="8" height="11" fill="#fffdf7"/>',
+  '<rect x="11" y="14" width="1" height="1" fill="#dfc99a"/>',
+  '<rect x="4" y="5" width="2" height="2" fill="#dfc99a"/>',
+  '<rect x="7" y="5" width="2" height="2" fill="#6ec44c"/>',
+  '<rect x="10" y="5" width="2" height="2" fill="#dfc99a"/>',
+  '<rect x="4" y="8" width="2" height="2" fill="#dfc99a"/>',
+  '<rect x="7" y="8" width="2" height="2" fill="#dfc99a"/>',
+  '<rect x="10" y="8" width="2" height="2" fill="#dfc99a"/>',
+  '<rect x="4" y="11" width="2" height="2" fill="#dfc99a"/>',
+  '<rect x="7" y="11" width="2" height="2" fill="#dfc99a"/>',
+  '<rect x="10" y="11" width="2" height="2" fill="#dfc99a"/>',
+  '<rect x="8" y="13" width="2" height="3" fill="#bb4b3d"/>'
 ];
 
-// В статике стоит день 1: настоящее число подставляет app.js по календарю устройства,
-// поэтому favicon и первый кадр всегда валидны, без пустого места.
 function logoMarkup() {
-  const svg = HEADER_SIGN
-    ? PixelSign.useMarkup(1)
-    : '<svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">' + GRASS_RECTS.join("") + "</svg>";
+  const svg = '<svg viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">' + HEADER_RECTS.join("") + "</svg>";
   return `${START}\n          ${svg}\n          ${END}`;
 }
 

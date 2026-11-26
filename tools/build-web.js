@@ -40,8 +40,8 @@ const version = JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf
 const swPath = path.join(OUT, "sw.js");
 const swSource = fs.readFileSync(swPath, "utf8");
 const swBuilt = swSource.replace(
-  /const CACHE_NAME = "pixel-calendar-2027-v\d+";/,
-  `const CACHE_NAME = "pixel-calendar-2027-v${version}";`
+  /const CACHE_NAME = "cachepixel-v\d+";/,
+  `const CACHE_NAME = "cachepixel-v${version}";`
 );if (swBuilt === swSource) {
   throw new Error("sw.js: не нашёл CACHE_NAME — привязка кэша к версии сломана");
 }

@@ -134,15 +134,15 @@ jobs:
 
       - name: Copy APK
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk pixel-calendar-2027-debug.apk
-          cp android/app/build/outputs/apk/release/app-release.apk pixel-calendar-2027-release.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk cachepixel-calendar-debug.apk
+          cp android/app/build/outputs/apk/release/app-release.apk cachepixel-calendar-release.apk
 
       - name: Report APK signature and flags
         run: |
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort | tail -1)"
           AAPT="$(find "$ANDROID_HOME/build-tools" -name aapt2 -type f | sort | tail -1)"
           : > apk-fingerprints.txt
-          for apk in pixel-calendar-2027-debug.apk pixel-calendar-2027-release.apk; do
+          for apk in cachepixel-calendar-debug.apk cachepixel-calendar-release.apk; do
             [ -f "$apk" ] || continue
             echo "== $apk =="
             if [ -n "$APKSIGNER" ]; then
@@ -154,21 +154,21 @@ jobs:
               "$AAPT" dump xmltree --file AndroidManifest.xml "$apk" | grep -i "debuggable" || echo "debuggable=true (не задан)"
             fi
           done
-          test -f pixel-calendar-2027-release.apk || { echo "::error::Release APK is absent — nothing to install for users."; exit 1; }
+          test -f cachepixel-calendar-release.apk || { echo "::error::Release APK is absent — nothing to install for users."; exit 1; }
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: pixel-calendar-2027-debug
-          path: pixel-calendar-2027-debug.apk
+          name: cachepixel-calendar-debug
+          path: cachepixel-calendar-debug.apk
           if-no-files-found: error
           retention-days: 7
 
       - name: Upload release APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: pixel-calendar-2027-release
-          path: pixel-calendar-2027-release.apk
+          name: cachepixel-calendar-release
+          path: cachepixel-calendar-release.apk
           if-no-files-found: error
           retention-days: 90
 
@@ -177,8 +177,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RELEASE_APK=pixel-calendar-2027-release.apk
-          DEBUG_APK=pixel-calendar-2027-debug.apk
+          RELEASE_APK=cachepixel-calendar-release.apk
+          DEBUG_APK=cachepixel-calendar-debug.apk
           if [ ! -f "$RELEASE_APK" ]; then
             echo "::error::Release APK is missing — a tag must never publish a debug-only release."
             exit 1
@@ -207,6 +207,6 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" "$RELEASE_APK" "$DEBUG_APK" \
               --verify-tag --latest \
-              --title "v$VERSION — Pixel Calendar" \
+              --title "v$VERSION - CachePixel" \
               --notes-file release-notes.md
           fi

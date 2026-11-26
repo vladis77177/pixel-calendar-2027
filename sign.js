@@ -1,6 +1,7 @@
-// Знак «Пиксельного календаря» («грядка с календарём», вариант A) и пиксельные
-// цифры 1–31. Один источник графики для всего: логотип в шапке, favicon, иконки
-// PWA, значок APK и splash. Снято с SVG дизайнера скриптом, без ручного переноса,
+// Знак CachePixel («грядка с календарём», вариант A) и пиксельные
+// цифры 1–31. Один источник графики для иконок: favicon, иконки PWA,
+// значок APK и splash (в шапке — свой статичный логотип, см. tools/build-sign.js).
+// Снято с SVG дизайнера скриптом, без ручного переноса,
 // чтобы знак не разъезжался между платформами.
 //
 // Работает и в браузере (<script src="sign.js"></script> до app.js, без defer —
@@ -89,7 +90,7 @@
   // Готовый SVG знака: favicon и исходник для генерации PNG.
   function signSvg(day) {
     const rects = rectsFor(day ? signGrid(day) : staticGrid());
-    const label = day ? "Пиксельный календарь, день " + day : "Пиксельный календарь";
+    const label = day ? "CachePixel, день " + day : "CachePixel";
     return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges" role="img" aria-label="'
       + label + '">' + rectsToSvg(rects) + "</svg>";
   }

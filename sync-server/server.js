@@ -18,6 +18,18 @@ const WWW = path.join(ROOT, "www");
 function defaultDataDir() {
   const home = os.homedir();
   if (process.platform === "win32") {
+    return path.join(process.env.LOCALAPPDATA || path.join(home, "AppData", "Local"), "cachepixel-sync");
+  }
+  if (process.platform === "darwin") {
+    return path.join(home, "Library", "Application Support", "cachepixel-sync");
+  }
+  return path.join(process.env.XDG_DATA_HOME || path.join(home, ".local", "share"), "cachepixel-sync");
+}
+
+// Прежнее место в пользовательских данных: оттуда данные переезжают при первом запуске.
+function legacyUserDataDir() {
+  const home = os.homedir();
+  if (process.platform === "win32") {
     return path.join(process.env.LOCALAPPDATA || path.join(home, "AppData", "Local"), "pixel-calendar-2027-sync");
   }
   if (process.platform === "darwin") {
@@ -27,6 +39,7 @@ function defaultDataDir() {
 }
 
 const LEGACY_DATA_DIR = path.join(ROOT, "data");
+const LEGACY_USER_DIR = legacyUserDataDir();
 const DATA_DIR = process.env.SYNC_DATA_DIR
   ? path.resolve(process.env.SYNC_DATA_DIR)
   : defaultDataDir();
@@ -163,22 +176,29 @@ function stateCandidates() {
 }
 
 // Первый запуск после смены места хранения: копируем состояние и код подключения
-// из прежней папки проекта. Копия, а не перенос — если что-то пойдёт не так,
-// исходные файлы остаются на месте.
+// из прежней папки пользовательских данных, а если её нет — из папки проекта.
+// Копия, а не перенос — если что-то пойдёт не так, исходные файлы остаются на месте.
 function adoptLegacyData() {
   if (process.env.SYNC_DATA_DIR) return;
   if (fs.existsSync(STATE_FILE) || fs.existsSync(TOKEN_FILE)) return;
-  if (!fs.existsSync(LEGACY_DATA_DIR)) return;
   const names = ["state.json", "state.bak.json", "token.txt"];
-  if (!names.some((name) => fs.existsSync(path.join(LEGACY_DATA_DIR, name)))) return;
+  const sources = [
+    { dir: LEGACY_USER_DIR, label: "пользовательских данных" },
+    { dir: LEGACY_DATA_DIR, label: "папки проекта" }
+  ];
+  const source = sources.find((item) => names.some((name) => fs.existsSync(path.join(item.dir, name))));
+  if (!source) return;
   fs.mkdirSync(DATA_DIR, { recursive: true });
   names.forEach((name) => {
-    const from = path.join(LEGACY_DATA_DIR, name);
-    if (fs.existsSync(from)) fs.copyFileSync(from, path.join(DATA_DIR, name));
+    const from = path.join(source.dir, name);
+    const to = path.join(DATA_DIR, name);
+    if (fs.existsSync(from) && !fs.existsSync(to)) fs.copyFileSync(from, to);
   });
-  const legacyBackups = path.join(LEGACY_DATA_DIR, "backups");
-  if (fs.existsSync(legacyBackups)) fs.cpSync(legacyBackups, BACKUP_DIR, { recursive: true });
-  console.log(`Данные перенесены из папки проекта: ${LEGACY_DATA_DIR} → ${DATA_DIR}`);
+  const legacyBackups = path.join(source.dir, "backups");
+  if (fs.existsSync(legacyBackups)) {
+    fs.cpSync(legacyBackups, BACKUP_DIR, { recursive: true, force: false, errorOnExist: false });
+  }
+  console.log(`Данные перенесены из ${source.label}: ${source.dir} → ${DATA_DIR}`);
 }
 
 adoptLegacyData();
@@ -454,7 +474,7 @@ if (!fs.existsSync(path.join(WWW, "index.html"))) {
 
 server.listen(PORT, HOST, () => {
   console.log("");
-  console.log("  Пиксельный календарь · сервер синхронизации");
+  console.log("  CachePixel · сервер синхронизации");
   console.log(`  Локально:  http://localhost:${PORT}`);
   lanAddresses().forEach((address) => {
     console.log(`  В сети:    http://${address}:${PORT}`);

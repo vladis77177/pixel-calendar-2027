@@ -2932,7 +2932,7 @@ html[data-profile="full"] .day-dialog::backdrop {
 }
 
 /* Длинная подпись сжимается и переносится, а не выдавливает кнопку за тост. */
-/* Текст тоста может содержать путь («Download/pixel-calendar-2027-backup-2026-11-18.json»):
+/* Текст тоста может содержать путь («Download/cachepixel-backup-2026-11-18.json»):
    переносим по любому символу, иначе длинная строка растягивает плашку. */
 .toast > span:not(.toast-cube) {
   min-width: 0;

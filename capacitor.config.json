@@ -1,6 +1,6 @@
 {
-  "appId": "ru.pixel.calendar2027",
-  "appName": "Пиксельный календарь",
+  "appId": "ru.cachepixel.calendar",
+  "appName": "CachePixel",
   "webDir": "www",
   "android": {
     "allowMixedContent": true,

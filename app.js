@@ -1,15 +1,37 @@
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "pixel-calendar-2027-v1";
+  const STORAGE_KEY = "cachepixel-v1";
   // Аварийные копии: BACKUP — последний рабочий снимок, CORRUPT — сырая строка, которую
   // не удалось разобрать (для ручного спасения). Большие хранилища не копируем: квота.
-  const BACKUP_KEY = "pixel-calendar-2027-backup";
-  const BACKUP_STAMP_KEY = "pixel-calendar-2027-backup-at";
-  const CORRUPT_KEY = "pixel-calendar-2027-corrupt";
+  const BACKUP_KEY = "cachepixel-backup";
+  const BACKUP_STAMP_KEY = "cachepixel-backup-at";
+  const CORRUPT_KEY = "cachepixel-corrupt";
   const BACKUP_LIMIT = 512 * 1024;
   const CORRUPT_LIMIT = 1024 * 1024;
   const BACKUP_REFRESH_MS = 10 * 60 * 1000;
+
+  // Ключи прежнего бренда: данные переезжают копированием, старые остаются на диске.
+  const LEGACY_KEYS = {
+    "cachepixel-v1": "pixel-calendar-2027-v1",
+    "cachepixel-backup": "pixel-calendar-2027-backup",
+    "cachepixel-backup-at": "pixel-calendar-2027-backup-at",
+    "cachepixel-corrupt": "pixel-calendar-2027-corrupt",
+    "cachepixel-update-dismissed": "pixel-calendar-2027-update-dismissed",
+    "cachepixel-release-check": "pixel-calendar-2027-release-check"
+  };
+
+  function adoptLegacyStorage() {
+    try {
+      Object.keys(LEGACY_KEYS).forEach((key) => {
+        if (localStorage.getItem(key) !== null) return;
+        const legacy = localStorage.getItem(LEGACY_KEYS[key]);
+        if (legacy !== null) localStorage.setItem(key, legacy);
+      });
+    } catch (error) {
+      // Хранилище недоступно — работаем как при пустой установке.
+    }
+  }
 
   let storeWasCorrupt = false;
   const VIEWS = ["week", "month", "quarter", "year"];
@@ -212,6 +234,7 @@
   };
 
   const initialToday = startOfDay(new Date());
+  adoptLegacyStorage();
   const stored = loadStore();
 
   let settingsFingerprint = "";
@@ -2554,7 +2577,7 @@ const TOAST_ACTION_MS = 6000;
 
   function exportJson() {
     const payload = {
-      app: "pixel-calendar-2027",
+      app: "cachepixel",
       version: schemaVersion(),
       exportedAt: new Date().toISOString(),
       view: state.view,
@@ -2562,7 +2585,7 @@ const TOAST_ACTION_MS = 6000;
       series: state.series,
       settings: state.settings
     };
-    const name = `pixel-calendar-backup-${toISO(new Date())}.json`;
+    const name = `cachepixel-backup-${toISO(new Date())}.json`;
     const text = JSON.stringify(payload, null, 2);
     // На телефоне сохранение делает нативный метод — в общую папку «Загрузки».
     // Тост показывает путь, иначе «копия скачана» звучит как обещание, которого не видно.
@@ -2635,10 +2658,10 @@ const TOAST_ACTION_MS = 6000;
     const lines = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
-      "PRODID:-//Pixel Calendar//RU",
+      "PRODID:-//CachePixel//RU",
       "CALSCALE:GREGORIAN",
       "METHOD:PUBLISH",
-      "X-WR-CALNAME:Пиксельный календарь"
+      "X-WR-CALNAME:CachePixel"
     ];
 
     Object.keys(state.tasks).sort().forEach((iso) => {
@@ -2652,7 +2675,7 @@ const TOAST_ACTION_MS = 6000;
           `DTSTART;VALUE=DATE:${icsDate(iso)}`,
           `DTEND;VALUE=DATE:${icsDate(end)}`,
           `SUMMARY:${icsEscape(task.done ? `[готово] ${task.text}` : task.text)}`,
-          `DESCRIPTION:${icsEscape(task.done ? "Выполнено · Пиксельный календарь" : "Пиксельный календарь")}`,
+          `DESCRIPTION:${icsEscape(task.done ? "Выполнено · CachePixel" : "CachePixel")}`,
           "STATUS:CONFIRMED",
           "END:VEVENT"
         );
@@ -2669,7 +2692,7 @@ const TOAST_ACTION_MS = 6000;
         `DTSTART;VALUE=DATE:${icsDate(series.start)}`,
         `DTEND;VALUE=DATE:${icsDate(end)}`,
         `SUMMARY:${icsEscape(series.text)}`,
-        `DESCRIPTION:${icsEscape(`Повтор: ${seriesSchedule(series)} · Пиксельный календарь`)}`,
+        `DESCRIPTION:${icsEscape(`Повтор: ${seriesSchedule(series)} · CachePixel`)}`,
         rruleForSeries(series),
         "STATUS:CONFIRMED"
       );
@@ -2685,7 +2708,7 @@ const TOAST_ACTION_MS = 6000;
   }
 
   function exportICS() {
-    const name = `pixel-calendar-${toISO(new Date())}.ics`;
+    const name = `cachepixel-${toISO(new Date())}.ics`;
     saveFileOnDevice(name, buildICS(), "text/calendar;charset=utf-8").then((result) => {
       if (!result.ok) {
         showToast("Не удалось сохранить файл. Попробуйте ещё раз.");
@@ -2703,8 +2726,8 @@ const TOAST_ACTION_MS = 6000;
       text: entry.text,
       dates: `${start}/${end}`,
       details: entry.isSeries
-        ? `Повтор: ${seriesSchedule(entry.series)} · Добавлено из Пиксельного календаря`
-        : "Добавлено из Пиксельного календаря"
+        ? `Повтор: ${seriesSchedule(entry.series)} · Добавлено из CachePixel`
+        : "Добавлено из CachePixel"
     });
     if (entry.isSeries) params.set("recur", rruleForSeries(entry.series));
     return `https://calendar.google.com/calendar/render?${params.toString()}`;
@@ -3634,7 +3657,7 @@ const TOAST_ACTION_MS = 6000;
       const mailBtn = document.getElementById("mailAuthorBtn");
       if (mailBtn) {
         const version = (window.__BUILD_INFO__ && window.__BUILD_INFO__.version) || "";
-        const subject = `Пиксельный календарь${version ? ` ${version}` : ""}: `;
+        const subject = `CachePixel${version ? ` ${version}` : ""}: `;
         const body = [
           "Что случилось или что хочется добавить:",
           "",
@@ -3734,13 +3757,13 @@ const TOAST_ACTION_MS = 6000;
       event.preventDefault();
       deferredInstallPrompt = event;
       els.installBtn.hidden = false;
-      els.installNote.textContent = "Календарь можно установить как приложение — он откроется в отдельном окне.";
+      els.installNote.textContent = "CachePixel можно установить как приложение — он откроется в отдельном окне.";
     });
     window.addEventListener("appinstalled", () => {
       deferredInstallPrompt = null;
       els.installBtn.hidden = true;
       els.installNote.textContent = "Приложение установлено. Ищи иконку на главном экране.";
-      showToast("Календарь установлен");
+      showToast("CachePixel установлен");
     });
   }
 
@@ -3748,12 +3771,12 @@ const TOAST_ACTION_MS = 6000;
 
   const RELEASE_API = window.PixelUpdate
     ? window.PixelUpdate.releaseApiUrl()
-    : "https://api.github.com/repos/vladis77177/pixel-calendar-2027/releases/latest";
+    : "https://api.github.com/repos/vladis77177/cachepixel-calendar/releases/latest";
   const RELEASE_APK = window.PixelUpdate
     ? window.PixelUpdate.apkDownloadUrl()
-    : "https://github.com/vladis77177/pixel-calendar-2027/releases/latest/download/pixel-calendar-2027-release.apk";
-  const UPDATE_DISMISS_KEY = "pixel-calendar-update-dismissed";
-  const RELEASE_CACHE_KEY = "pixel-calendar-release-check";
+    : "https://github.com/vladis77177/cachepixel-calendar/releases/latest/download/cachepixel-calendar-release.apk";
+  const UPDATE_DISMISS_KEY = "cachepixel-update-dismissed";
+  const RELEASE_CACHE_KEY = "cachepixel-release-check";
   // Кэш показывается сразу и живёт офлайн сколько угодно, но в сеть ходим
   // не реже раза в полчаса: иначе свежий релиз замечается только через сутки.
   const RELEASE_RECHECK_INTERVAL = 30 * 60 * 1000;
@@ -3969,7 +3992,7 @@ const TOAST_ACTION_MS = 6000;
       showToast("Сохранять нечего");
       return;
     }
-    const name = `pixel-calendar-raw-${new Date().toISOString().slice(0, 10)}.json`;
+    const name = `cachepixel-raw-${new Date().toISOString().slice(0, 10)}.json`;
     saveFileOnDevice(name, source, "application/json").then((result) => {
       if (!result.ok) {
         showToast("Не удалось сохранить копию. Попробуйте ещё раз.");
